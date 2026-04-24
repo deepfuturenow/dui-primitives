@@ -1,3 +1,23 @@
 node_modules/
 dist/
+packages/docs/static/index.js
+packages/docs/static/llms.txt
 .DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Tools
+.busytown/
+.worktrees/
+plans/
+
+# Environment
+.env
+.env.local
