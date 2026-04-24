@@ -2,8 +2,8 @@
 
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
-import { base } from "@dui/core/base";
-import { FloatingPortalController } from "@dui/core/floating-portal-controller";
+import { base } from "../core/base.ts";
+import { FloatingPortalController } from "../core/floating-portal-controller.ts";
 import { DuiMenuItemPrimitive } from "./menu-item.ts";
 
 const hostStyles = css`

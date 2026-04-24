@@ -44,10 +44,19 @@
     "./calendar": "./src/calendar/index.ts",
     "./split-button": "./src/split-button/index.ts",
     "./card": "./src/card/index.ts",
-    "./card-grid": "./src/card-grid/index.ts"
+    "./card-grid": "./src/card-grid/index.ts",
+    "./core": "./src/core/index.ts",
+    "./core/base": "./src/core/base.ts",
+    "./core/dom": "./src/core/dom.ts",
+    "./core/event": "./src/core/event.ts",
+    "./core/floating-popup-utils": "./src/core/floating-popup-utils.ts",
+    "./core/floating-portal-controller": "./src/core/floating-portal-controller.ts",
+    "./core/layout-types": "./src/core/layout-types.ts",
+    "./core/popup-coordinator": "./src/core/popup-coordinator.ts"
   },
   "imports": {
     "lit": "npm:lit@^3.3.2",
-    "@lit/context": "npm:@lit/context@^1.1.3"
+    "@lit/context": "npm:@lit/context@^1.1.3",
+    "@floating-ui/dom": "npm:@floating-ui/dom@^1.7.4"
   }
 }

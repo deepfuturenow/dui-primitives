@@ -3,12 +3,12 @@
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { provide } from "@lit/context";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 import {
   type RadioGroupContext,
   radioGroupContext,
 } from "./radio-group-context.ts";
-import { customEvent } from "@dui/core/event";
+import { customEvent } from "../core/event.ts";
 
 export const valueChangeEvent = customEvent<{ value: string }>("value-change", {
   bubbles: true,

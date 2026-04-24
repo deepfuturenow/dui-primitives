@@ -1,6 +1,6 @@
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 
 /** Structural styles only — layout CSS. */
 const styles = css`

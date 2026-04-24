@@ -2,7 +2,7 @@
 
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { ContextConsumer } from "@lit/context";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 import { sidebarContext } from "./sidebar-context.ts";
 
 

@@ -3,13 +3,13 @@
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { ContextConsumer } from "@lit/context";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 import { previewCardContext } from "./preview-card-context.ts";
-import { FloatingPortalController } from "@dui/core/floating-portal-controller";
+import { FloatingPortalController } from "../core/floating-portal-controller.ts";
 import {
   type FloatingPopupSide,
   renderArrow,
-} from "@dui/core/floating-popup-utils";
+} from "../core/floating-popup-utils.ts";
 
 const hostStyles = css`
   :host {

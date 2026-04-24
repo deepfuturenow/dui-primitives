@@ -2,7 +2,7 @@
 
 import { css, html, LitElement, type PropertyValues, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
-import { getRootDocument } from "@dui/core/dom";
+import { getRootDocument } from "../core/dom.ts";
 
 export type QueryRoot = "shadow" | "document";
 

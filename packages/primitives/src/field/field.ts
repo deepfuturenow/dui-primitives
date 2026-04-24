@@ -1,6 +1,6 @@
 import { css, html, LitElement, type PropertyValues, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 
 /** Selector matching all DUI form controls that can be wired by a field. */
 const CONTROL_SELECTOR = [

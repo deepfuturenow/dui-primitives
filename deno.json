@@ -1,6 +1,5 @@
 {
   "workspace": [
-    "./packages/core",
     "./packages/primitives",
     "./packages/docs"
   ],

@@ -3,7 +3,7 @@
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 
 const styles = css`
   :host {

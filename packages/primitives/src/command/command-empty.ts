@@ -3,7 +3,7 @@
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { consume } from "@lit/context";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 import { type CommandContext, commandContext } from "./command-context.ts";
 
 const styles = css`

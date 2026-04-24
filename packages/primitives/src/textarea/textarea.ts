@@ -5,8 +5,8 @@ import { property } from "lit/decorators.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 import { styleMap } from "lit/directives/style-map.js";
-import { base } from "@dui/core/base";
-import { customEvent } from "@dui/core/event";
+import { base } from "../core/base.ts";
+import { customEvent } from "../core/event.ts";
 
 export type TextareaResize = "none" | "vertical" | "horizontal" | "both" | "auto";
 

@@ -1,5 +1,5 @@
 import { css, html, LitElement } from "lit";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 
 const styles = css`
   :host {

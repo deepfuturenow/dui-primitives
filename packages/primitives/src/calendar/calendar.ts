@@ -1,7 +1,7 @@
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
-import { base } from "@dui/core/base";
-import { customEvent } from "@dui/core/event";
+import { base } from "../core/base.ts";
+import { customEvent } from "../core/event.ts";
 
 export const valueChangeEvent = customEvent<{ value: string }>(
   "value-change",

@@ -2,7 +2,7 @@
 
 import { css, html, LitElement, svg, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 
 
 

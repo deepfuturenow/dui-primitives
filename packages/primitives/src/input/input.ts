@@ -4,8 +4,8 @@ import { css, html, LitElement, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
-import { base } from "@dui/core/base";
-import { customEvent } from "@dui/core/event";
+import { base } from "../core/base.ts";
+import { customEvent } from "../core/event.ts";
 
 export const inputChangeEvent = customEvent<{ value: string }>("input-change", {
   bubbles: true,

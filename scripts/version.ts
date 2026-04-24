@@ -1,22 +1,18 @@
 #!/usr/bin/env -S deno run --allow-all
 /**
- * Lockstep version bump — updates version across core + primitives simultaneously.
+ * Version bump — updates version in packages/primitives/deno.json.
  *
  * Usage:
  *   deno run --allow-all scripts/version.ts 0.2.0
- *   deno run --allow-all scripts/version.ts patch   # 0.1.0 → 0.1.1
- *   deno run --allow-all scripts/version.ts minor   # 0.1.0 → 0.2.0
- *   deno run --allow-all scripts/version.ts major   # 0.1.0 → 1.0.0
+ *   deno run --allow-all scripts/version.ts patch   # 1.0.0 → 1.0.1
+ *   deno run --allow-all scripts/version.ts minor   # 1.0.0 → 1.1.0
+ *   deno run --allow-all scripts/version.ts major   # 1.0.0 → 2.0.0
  */
 
 import { resolve, join } from "jsr:@std/path@^1";
 
 const ROOT = resolve(import.meta.dirname!, "..");
-
-const DENO_JSON_FILES = [
-  "packages/core/deno.json",
-  "packages/primitives/deno.json",
-];
+const DENO_JSON = "packages/primitives/deno.json";
 
 function parseVersion(v: string): [number, number, number] {
   const parts = v.split(".").map(Number);
@@ -45,31 +41,18 @@ async function main() {
     Deno.exit(1);
   }
 
-  // Read current version from core
-  const coreJson = JSON.parse(
-    await Deno.readTextFile(join(ROOT, "packages/core/deno.json")),
-  );
-  const currentVersion = coreJson.version ?? "0.1.0";
+  const path = join(ROOT, DENO_JSON);
+  const json = JSON.parse(await Deno.readTextFile(path));
+  const currentVersion = json.version ?? "0.1.0";
   const newVersion = bumpVersion(currentVersion, bump);
 
   console.log(`📦 Version bump: ${currentVersion} → ${newVersion}\n`);
 
-  // Update all deno.json files
-  for (const file of DENO_JSON_FILES) {
-    const path = join(ROOT, file);
-    try {
-      const json = JSON.parse(await Deno.readTextFile(path));
-      if (json.version) {
-        json.version = newVersion;
-        await Deno.writeTextFile(path, JSON.stringify(json, null, 2) + "\n");
-        console.log(`   ✅ ${file}`);
-      }
-    } catch (e) {
-      console.log(`   ⏭️  ${file} (skipped: ${e instanceof Error ? e.message : e})`);
-    }
-  }
+  json.version = newVersion;
+  await Deno.writeTextFile(path, JSON.stringify(json, null, 2) + "\n");
+  console.log(`   ✅ ${DENO_JSON}`);
 
-  console.log(`\n✨ All packages updated to ${newVersion}`);
+  console.log(`\n✨ Updated to ${newVersion}`);
   console.log(`   Next: git commit and tag with v${newVersion}`);
 }
 

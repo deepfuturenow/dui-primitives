@@ -1,7 +1,7 @@
 /** Ported from original DUI: deep-future-app/app/client/components/dui/tabs */
 
 import { css, html, LitElement, type TemplateResult } from "lit";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 
 const styles = css`
   :host {

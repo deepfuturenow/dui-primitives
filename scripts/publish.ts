@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-all
 /**
- * Lockstep publish — builds core + primitives and publishes to npm.
+ * Publish — builds and publishes @deepfuture/dui-primitives to npm.
  *
  * Usage:
  *   deno run --allow-all scripts/publish.ts           # dry run
@@ -15,12 +15,7 @@ import { resolve, join } from "jsr:@std/path@^1";
 
 const ROOT = resolve(import.meta.dirname!, "..");
 const DIST = join(ROOT, "dist");
-
-// Publish order: core first (primitives depends on it)
-const PACKAGES = [
-  "dui-core",
-  "dui-primitives",
-] as const;
+const PKG_DIR = join(DIST, "dui-primitives");
 
 async function run(cmd: string[], cwd: string): Promise<boolean> {
   const proc = new Deno.Command(cmd[0], {
@@ -42,44 +37,38 @@ async function main() {
     console.log("🚀 DUI Primitives Publish — LIVE PUBLISH to npm\n");
   }
 
-  // Step 1: Build all packages
-  console.log("Step 1: Building packages...\n");
+  // Step 1: Build
+  console.log("Step 1: Building package...\n");
   const buildOk = await run(["deno", "run", "--allow-all", "scripts/build.ts"], ROOT);
   if (!buildOk) {
     console.error("❌ Build failed");
     Deno.exit(1);
   }
 
-  // Step 2: Verify all packages have package.json
-  console.log("\nStep 2: Verifying packages...\n");
-  for (const pkg of PACKAGES) {
-    const pkgDir = join(DIST, pkg);
-    try {
-      const pkgJson = JSON.parse(
-        await Deno.readTextFile(join(pkgDir, "package.json")),
-      );
-      console.log(`   ✅ ${pkgJson.name}@${pkgJson.version}`);
-    } catch {
-      console.error(`   ❌ ${pkg}: missing package.json`);
-      Deno.exit(1);
-    }
+  // Step 2: Verify package.json
+  console.log("\nStep 2: Verifying package...\n");
+  try {
+    const pkgJson = JSON.parse(
+      await Deno.readTextFile(join(PKG_DIR, "package.json")),
+    );
+    console.log(`   ✅ ${pkgJson.name}@${pkgJson.version}`);
+  } catch {
+    console.error(`   ❌ dui-primitives: missing package.json`);
+    Deno.exit(1);
   }
 
   // Step 3: Publish (or dry-run)
   console.log(`\nStep 3: ${dryRun ? "Dry-run" : "Publishing"}...\n`);
 
-  for (const pkg of PACKAGES) {
-    const pkgDir = join(DIST, pkg);
-    const args = dryRun
-      ? ["npm", "publish", "--access", "public", "--dry-run"]
-      : ["npm", "publish", "--access", "public"];
+  const args = dryRun
+    ? ["npm", "publish", "--access", "public", "--dry-run"]
+    : ["npm", "publish", "--access", "public"];
 
-    console.log(`   📤 ${pkg}...`);
-    const ok = await run(args, pkgDir);
-    if (!ok) {
-      console.error(`   ❌ Failed to publish ${pkg}`);
-      Deno.exit(1);
-    }
+  console.log(`   📤 dui-primitives...`);
+  const ok = await run(args, PKG_DIR);
+  if (!ok) {
+    console.error(`   ❌ Failed to publish dui-primitives`);
+    Deno.exit(1);
   }
 
   console.log(`\n✨ ${dryRun ? "Dry run" : "Publish"} complete!`);

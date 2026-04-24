@@ -3,7 +3,7 @@
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { ContextConsumer } from "@lit/context";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 import { sidebarContext } from "./sidebar-context.ts";
 
 

@@ -2,7 +2,7 @@
 
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { consume } from "@lit/context";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 import { type TabsContext, tabsContext } from "./tabs-context.ts";
 
 const styles = css`

@@ -1,8 +1,8 @@
 import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
-import { base } from "@dui/core/base";
-import { customEvent } from "@dui/core/event";
-import { FloatingPortalController } from "@dui/core/floating-portal-controller";
+import { base } from "../core/base.ts";
+import { customEvent } from "../core/event.ts";
+import { FloatingPortalController } from "../core/floating-portal-controller.ts";
 import { DuiMenuItemPrimitive } from "../menu/menu-item.ts";
 
 /** Fired when the action (left) button is clicked. */

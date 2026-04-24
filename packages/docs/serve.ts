@@ -6,18 +6,14 @@ const DEFAULT_PORT = 4041;
 const STATIC_DIR = resolve(import.meta.dirname!, "static");
 const DOCS_ENTRY = resolve(import.meta.dirname!, "src/index.ts");
 const WORKSPACE_ROOT = resolve(import.meta.dirname!, "../..");
-const CORE_VERSION: string = JSON.parse(
-  Deno.readTextFileSync(join(WORKSPACE_ROOT, "packages/core/deno.json")),
+const PKG_VERSION: string = JSON.parse(
+  Deno.readTextFileSync(join(WORKSPACE_ROOT, "packages/primitives/deno.json")),
 ).version;
 
 /**
- * Resolve `@dui/*` workspace package imports using their deno.json exports maps.
+ * Resolve `@dui/*` workspace package imports using the primitives deno.json exports map.
  */
 const workspacePackages: Record<string, { dir: string; exports: Record<string, string> }> = {
-  "@dui/core": {
-    dir: join(WORKSPACE_ROOT, "packages/core"),
-    exports: JSON.parse(Deno.readTextFileSync(join(WORKSPACE_ROOT, "packages/core/deno.json"))).exports,
-  },
   "@dui/primitives": {
     dir: join(WORKSPACE_ROOT, "packages/primitives"),
     exports: JSON.parse(Deno.readTextFileSync(join(WORKSPACE_ROOT, "packages/primitives/deno.json"))).exports,
@@ -120,7 +116,7 @@ if (buildMode) {
     minify: true,
     plugins: [duiWorkspacePlugin, cssRawTextPlugin],
     nodePaths: [join(WORKSPACE_ROOT, "node_modules")],
-    define: { __DUI_VERSION__: JSON.stringify(CORE_VERSION) },
+    define: { __DUI_VERSION__: JSON.stringify(PKG_VERSION) },
   });
   console.log("Build complete → packages/docs/static/");
   esbuild.stop();
@@ -134,7 +130,7 @@ if (buildMode) {
     write: false,
     plugins: [duiWorkspacePlugin, cssRawTextPlugin],
     nodePaths: [join(WORKSPACE_ROOT, "node_modules")],
-    define: { __DUI_VERSION__: JSON.stringify(CORE_VERSION) },
+    define: { __DUI_VERSION__: JSON.stringify(PKG_VERSION) },
     banner: {
       js: `(() => { new EventSource("/esbuild").addEventListener("change", () => location.reload()); })();`,
     },

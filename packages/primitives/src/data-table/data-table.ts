@@ -4,8 +4,8 @@ import { css, html, LitElement, nothing, type PropertyValues, type TemplateResul
 import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { styleMap, type StyleInfo } from "lit/directives/style-map.js";
-import { base } from "@dui/core/base";
-import { customEvent } from "@dui/core/event";
+import { base } from "../core/base.ts";
+import { customEvent } from "../core/event.ts";
 
 
 // ── Types ──────────────────────────────────────────────────────────────

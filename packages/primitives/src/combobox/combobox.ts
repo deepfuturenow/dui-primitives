@@ -4,9 +4,9 @@ import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { live } from "lit/directives/live.js";
-import { base } from "@dui/core/base";
-import { customEvent } from "@dui/core/event";
-import { FloatingPortalController } from "@dui/core/floating-portal-controller";
+import { base } from "../core/base.ts";
+import { customEvent } from "../core/event.ts";
+import { FloatingPortalController } from "../core/floating-portal-controller.ts";
 
 
 
