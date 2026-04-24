@@ -1,0 +1,15 @@
+{
+  "name": "@dui/docs-primitives",
+  "version": "0.0.21",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "tasks": {
+    "dev": "deno run --allow-all serve.ts"
+  },
+  "imports": {
+    "lit": "npm:lit@^3.3.2",
+    "esbuild": "npm:esbuild@^0.27.2",
+    "shiki": "npm:shiki@^3"
+  }
+}

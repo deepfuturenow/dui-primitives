@@ -1,7 +1,8 @@
 {
   "workspace": [
     "./packages/core",
-    "./packages/primitives"
+    "./packages/primitives",
+    "./packages/docs"
   ],
   "unstable": ["raw-imports"],
   "compilerOptions": {
@@ -15,7 +16,9 @@
   },
   "nodeModulesDir": "auto",
   "tasks": {
+    "dev": "deno run --allow-all packages/docs/serve.ts",
     "build": "deno run --allow-all scripts/build.ts",
+    "build:docs": "deno run --allow-all packages/docs/serve.ts --build",
     "version": "deno run --allow-all scripts/version.ts",
     "publish": "deno run --allow-all scripts/publish.ts",
     "publish:live": "deno run --allow-all scripts/publish.ts --publish"

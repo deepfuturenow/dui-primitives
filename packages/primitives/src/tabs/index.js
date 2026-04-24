@@ -1,0 +1,10 @@
+import { DuiTabsPrimitive, valueChangeEvent } from "./tabs.ts";
+export { DuiTabsPrimitive, valueChangeEvent };
+import { DuiTabsListPrimitive } from "./tabs-list.ts";
+export { DuiTabsListPrimitive };
+import { DuiTabPrimitive } from "./tab.ts";
+export { DuiTabPrimitive };
+import { DuiTabsPanelPrimitive } from "./tabs-panel.ts";
+export { DuiTabsPanelPrimitive };
+import { DuiTabsIndicatorPrimitive } from "./tabs-indicator.ts";
+export { DuiTabsIndicatorPrimitive };

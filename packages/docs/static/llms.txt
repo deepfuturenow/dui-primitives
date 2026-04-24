@@ -1,0 +1,74 @@
+# DUI Primitives — Unstyled, Accessible Web Components
+
+> Structure and behavior only. No aesthetic opinions.
+> Extend with your own CSS to build any design system.
+
+## Getting Started
+
+Install: npm install @deepfuture/dui-primitives
+Import: import { DuiButtonPrimitive } from "@dui/primitives/button";
+
+## Primitives
+
+### Accordion
+- Tag: `<dui-accordion>`
+- Import: `@dui/primitives/accordion`
+- Description: Vertically stacked sections with expandable/collapsible panels.
+- Properties: value (string[] | undefined), defaultValue (string[], []), disabled (boolean, false), multiple (boolean, false), loopFocus (boolean, true), orientation ("vertical" | "horizontal", "vertical")
+- Events: value-change (string[])
+- Slots: default (dui-accordion-item children)
+
+### Button
+- Tag: `<dui-button>`
+- Import: `@dui/primitives/button`
+- Description: A clickable button element. Renders as <a> when href is provided.
+- Properties: disabled (boolean, false), type ("button" | "submit" | "reset", "button"), href (string), target (string)
+- Events: dui-navigate ({ href: string })
+- Slots: default (Button content)
+
+### Checkbox
+- Tag: `<dui-checkbox>`
+- Import: `@dui/primitives/checkbox`
+- Description: A tri-state checkbox with form participation.
+- Properties: checked (boolean, false), indeterminate (boolean, false), disabled (boolean, false), name (string), value (string, "on")
+- Events: change
+- Slots: default (Checkbox label), indicator (Custom check indicator)
+
+### Dialog
+- Tag: `<dui-dialog>`
+- Import: `@dui/primitives/dialog`
+- Description: A modal dialog with focus trapping and backdrop.
+- Properties: open (boolean, false), modal (boolean, true)
+- Events: open-change (boolean)
+- Slots: default (Dialog sub-components)
+
+### Input
+- Tag: `<dui-input>`
+- Import: `@dui/primitives/input`
+- Description: A text input with form participation.
+- Properties: value (string, ""), type (string, "text"), placeholder (string), disabled (boolean, false), name (string)
+- Events: input, change
+
+### Switch
+- Tag: `<dui-switch>`
+- Import: `@dui/primitives/switch`
+- Description: A toggle switch with form participation.
+- Properties: checked (boolean, false), disabled (boolean, false), name (string)
+- Events: change
+- Slots: default (Label)
+
+### Tabs
+- Tag: `<dui-tabs>`
+- Import: `@dui/primitives/tabs`
+- Description: Tabbed content with keyboard navigation and ARIA tabs pattern.
+- Properties: value (string | undefined), defaultValue (string), orientation ("horizontal" | "vertical", "horizontal")
+- Events: value-change (string)
+- Slots: default (dui-tabs-list and dui-tabs-panel children)
+
+### Tooltip
+- Tag: `<dui-tooltip>`
+- Import: `@dui/primitives/tooltip`
+- Description: A popup tooltip triggered on hover/focus.
+- Properties: open (boolean, false), placement (string, "top"), delay (number, 300)
+- Events: open-change (boolean)
+- Slots: default (Trigger and popup sub-components)
