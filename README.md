@@ -1,7 +1,7 @@
 # DUI Primitives
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![npm](https://img.shields.io/npm/v/@deepfuture/dui-core.svg)](https://www.npmjs.com/package/@deepfuture/dui-core)
+[![npm](https://img.shields.io/npm/v/@deepfuture/dui-primitives.svg)](https://www.npmjs.com/package/@deepfuture/dui-primitives)
 
 Unstyled, accessible [Lit](https://lit.dev) web components. Structure and behavior only — zero visual opinions.
 
@@ -23,7 +23,7 @@ Building a custom design system shouldn't mean reimplementing accordion keyboard
 ## Install
 
 ```bash
-npm install @deepfuture/dui-core @deepfuture/dui-primitives
+npm install @deepfuture/dui-primitives
 ```
 
 ## Quick Start
@@ -164,14 +164,13 @@ Slot-based composition for content projection:
 </dui-accordion-item>
 ```
 
-## Packages
+## Package
 
 | Package | Description |
 |---------|------------|
-| [`@deepfuture/dui-core`](https://www.npmjs.com/package/@deepfuture/dui-core) | Base class, event factory, popup coordinator, floating UI utilities |
-| [`@deepfuture/dui-primitives`](https://www.npmjs.com/package/@deepfuture/dui-primitives) | All unstyled component primitives |
+| [`@deepfuture/dui-primitives`](https://www.npmjs.com/package/@deepfuture/dui-primitives) | All unstyled component primitives + core utilities |
 
-### What's in core?
+Core utilities (base class, event factory, popup coordinator, floating UI) are included and available via `@deepfuture/dui-primitives/core`:
 
 - **`base`** — shared CSS reset applied to all primitive shadow DOMs
 - **`customEvent()`** — typed event factory for component events

@@ -60,7 +60,7 @@ Create `packages/primitives/src/{name}/{name}.ts`:
 ```typescript
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
-import { base } from "@dui/core/base";
+import { base } from "../core/base.ts";
 
 /** Structural styles only — layout and behavioral CSS. */
 const styles = css`
@@ -102,13 +102,13 @@ export class Dui{Name}Primitive extends LitElement {
 **Key rules:**
 - Class name uses `Primitive` suffix: `Dui{Name}Primitive`
 - `static tagName` with `as const` — NO `@customElement` decorator
-- `static override styles = [base, styles]` — `base` from `@dui/core/base`
+- `static override styles = [base, styles]` — `base` from `../core/base.ts`
 - **Structural CSS only** — no colors, fonts, spacing values, border-radius, shadows
 - `part="root"` on root internal element — this is the consumer's styling surface
 - All properties use `accessor` keyword
 - All internal state uses `@state() accessor #name`
 - All private methods use native `#private` syntax
-- Events use `customEvent()` factory from `@dui/core/event`
+- Events use `customEvent()` factory from `../core/event.ts`
 
 ### Step 4 — Create the index
 
