@@ -1,0 +1,23 @@
+{
+  "workspace": [
+    "./packages/core",
+    "./packages/primitives"
+  ],
+  "unstable": ["raw-imports"],
+  "compilerOptions": {
+    "lib": [
+      "deno.ns",
+      "DOM",
+      "DOM.Iterable",
+      "DOM.AsyncIterable",
+      "ESNext"
+    ]
+  },
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "build": "deno run --allow-all scripts/build.ts",
+    "version": "deno run --allow-all scripts/version.ts",
+    "publish": "deno run --allow-all scripts/publish.ts",
+    "publish:live": "deno run --allow-all scripts/publish.ts --publish"
+  }
+}
