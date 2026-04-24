@@ -1,5 +1,10 @@
 node_modules/
 dist/
+
+# tsc build artifacts in src/ (but keep hand-written .d.ts like global.d.ts)
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+!packages/*/src/global.d.ts
 packages/docs/static/index.js
 packages/docs/static/llms.txt
 .DS_Store
