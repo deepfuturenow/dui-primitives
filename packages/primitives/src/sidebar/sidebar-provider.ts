@@ -50,7 +50,7 @@ export class DuiSidebarProviderPrimitive extends LitElement {
 
   /** Visual variant of the sidebar. */
   @property({ reflect: true })
-  accessor variant: string = "";
+  accessor variant: "sidebar" | "floating" | "inset" = "sidebar";
 
   /** How the sidebar collapses. */
   @property({ reflect: true })
