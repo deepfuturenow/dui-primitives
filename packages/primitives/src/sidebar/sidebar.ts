@@ -10,7 +10,6 @@ const styles = css`
   :host {
     display: block;
     flex-shrink: 0;
-    height: 100%;
   }
 
   .DesktopOuter {
