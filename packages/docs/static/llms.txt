@@ -85,5 +85,27 @@ Import: import { DuiButtonPrimitive } from "@dui/primitives/button";
 - Tag: `<dui-tree-item>`
 - Import: `@dui/primitives/tree`
 - Description: A node in a <dui-tree>. Becomes a branch automatically when it contains child <dui-tree-item> elements.
-- Properties: value (string), disabled (boolean, false)
+- Properties: value (string), disabled (boolean, false), hasChildren (boolean, false), loading (boolean, false)
+- Events: dui-load-children ({ value: string })
 - Slots: label (The visible label/content for this node), end (Trailing content (icons, badges, actions)), default (Child <dui-tree-item> elements (makes this item a branch))
+
+### Splitter
+- Tag: `<dui-splitter>`
+- Import: `@dui/primitives/splitter`
+- Description: Resizable panel group implementing the W3C Window Splitter pattern. Panels divided by draggable handles, sized by percent.
+- Properties: orientation ("horizontal" | "vertical", "horizontal"), value (number[] | undefined), defaultValue (number[], []), disabled (boolean, false), keyboardStep (number, 10), keyboardStepLarge (number, 25), autoSaveId (string)
+- Events: value-change (number[])
+- Slots: default (dui-splitter-panel and dui-splitter-handle children in DOM order)
+
+### Splitter Panel
+- Tag: `<dui-splitter-panel>`
+- Import: `@dui/primitives/splitter`
+- Description: A single resizable panel inside a dui-splitter. Owns its own min/max constraints.
+- Properties: panelId (string), defaultSize (number), minSize (number, 0), maxSize (number, 100), order (number)
+- Slots: default (Panel content)
+
+### Splitter Handle
+- Tag: `<dui-splitter-handle>`
+- Import: `@dui/primitives/splitter`
+- Description: Draggable separator between two adjacent panels. Renders role=separator with full ARIA wiring.
+- Properties: disabled (boolean, false)

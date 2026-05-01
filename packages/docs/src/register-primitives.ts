@@ -38,6 +38,7 @@ import { DuiSidebarPrimitive, DuiSidebarProviderPrimitive, DuiSidebarContentPrim
 import { DuiSliderPrimitive } from "@dui/primitives/slider";
 import { DuiSpinnerPrimitive } from "@dui/primitives/spinner";
 import { DuiSplitButtonPrimitive } from "@dui/primitives/split-button";
+import { DuiSplitterPrimitive, DuiSplitterPanelPrimitive, DuiSplitterHandlePrimitive } from "@dui/primitives/splitter";
 import { DuiStepperPrimitive } from "@dui/primitives/stepper";
 import { DuiSwitchPrimitive } from "@dui/primitives/switch";
 import { DuiTabsPrimitive, DuiTabsListPrimitive, DuiTabPrimitive, DuiTabsPanelPrimitive, DuiTabsIndicatorPrimitive } from "@dui/primitives/tabs";
@@ -130,6 +131,9 @@ reg(DuiSidebarInsetPrimitive);
 reg(DuiSliderPrimitive);
 reg(DuiSpinnerPrimitive);
 reg(DuiSplitButtonPrimitive);
+reg(DuiSplitterPrimitive);
+reg(DuiSplitterPanelPrimitive);
+reg(DuiSplitterHandlePrimitive);
 reg(DuiStepperPrimitive);
 reg(DuiSwitchPrimitive);
 reg(DuiTabsPrimitive);

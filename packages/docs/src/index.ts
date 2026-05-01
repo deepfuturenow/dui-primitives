@@ -15,3 +15,4 @@ import "./pages/docs-page-switch.ts";
 import "./pages/docs-page-input.ts";
 import "./pages/docs-page-tooltip.ts";
 import "./pages/docs-page-tree.ts";
+import "./pages/docs-page-splitter.ts";

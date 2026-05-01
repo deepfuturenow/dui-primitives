@@ -44,6 +44,7 @@
     "./menubar": "./src/menubar/index.ts",
     "./calendar": "./src/calendar/index.ts",
     "./split-button": "./src/split-button/index.ts",
+    "./splitter": "./src/splitter/index.ts",
     "./card": "./src/card/index.ts",
     "./card-grid": "./src/card-grid/index.ts",
     "./core": "./src/core/index.ts",
