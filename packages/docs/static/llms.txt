@@ -65,6 +65,34 @@ Import: import { DuiButtonPrimitive } from "@dui/primitives/button";
 - Events: value-change (string)
 - Slots: default (dui-tabs-list and dui-tabs-panel children)
 
+### Toast Region
+- Tag: `<dui-toast-region>`
+- Import: `@dui/primitives/toast`
+- Description: Viewport and provider for a stack of toasts. Manages position, registry, and pause-on-hover/focus/visibility.
+- Properties: position ("top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right", "bottom-right"), maxVisible (number, 3), label (string, "Notifications"), expandOnHover (boolean, true), expanded (boolean | undefined), swipeDirections (string), swipeThreshold (number, 50), hotkey (string, "Alt+T")
+- Events: toast-dismiss ({ id, reason })
+- Slots: default (One or more <dui-toast> elements.)
+
+### Toast
+- Tag: `<dui-toast>`
+- Import: `@dui/primitives/toast`
+- Description: A single toast notification with auto-dismiss, ARIA wiring, and three escape valves for content control.
+- Properties: open (boolean | undefined), defaultOpen (boolean, true), duration (number, 4000), type ("default" | "info" | "success" | "warning" | "error" | "loading", "default"), priority ("polite" | "assertive", "polite"), toastId (string), headless (boolean, false)
+- Events: open-change ({ open: boolean }), dismiss ({ id, reason })
+- Slots: default (Default content; rendered after title/description.), title (Title content; auto-wires aria-labelledby.), description (Description content; auto-wires aria-describedby.), action (Action region (typically <dui-toast-action>).), close (Close region (typically <dui-toast-close>).)
+
+### Toast Action
+- Tag: `<dui-toast-action>`
+- Import: `@dui/primitives/toast`
+- Description: Wrapper that dismisses the parent toast on click with reason 'action'.
+- Slots: default (Action button or content.)
+
+### Toast Close
+- Tag: `<dui-toast-close>`
+- Import: `@dui/primitives/toast`
+- Description: Wrapper that dismisses the parent toast on click with reason 'close'.
+- Slots: default (Close button or icon.)
+
 ### Tooltip
 - Tag: `<dui-tooltip>`
 - Import: `@dui/primitives/tooltip`
