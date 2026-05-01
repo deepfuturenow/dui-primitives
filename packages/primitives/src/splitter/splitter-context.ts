@@ -6,6 +6,12 @@ export type SplitterPanelMeta = {
   readonly maxSize: number;
   readonly defaultSize: number | undefined;
   readonly order: number | undefined;
+  /**
+   * Whether the panel should auto-flip to a `collapsed` state when its
+   * size reaches ~0 via drag or keyboard nudge. Has no effect on the
+   * imperative `collapsePanel` / `expandPanel` API, which always works.
+   */
+  readonly collapsible: boolean;
   readonly el: HTMLElement;
 };
 

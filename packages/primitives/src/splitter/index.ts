@@ -1,5 +1,9 @@
-import { DuiSplitterPrimitive, valueChangeEvent } from "./splitter.ts";
-export { DuiSplitterPrimitive, valueChangeEvent };
+import {
+  collapseChangeEvent,
+  DuiSplitterPrimitive,
+  valueChangeEvent,
+} from "./splitter.ts";
+export { collapseChangeEvent, DuiSplitterPrimitive, valueChangeEvent };
 import { DuiSplitterPanelPrimitive } from "./splitter-panel.ts";
 export { DuiSplitterPanelPrimitive };
 import { DuiSplitterHandlePrimitive } from "./splitter-handle.ts";

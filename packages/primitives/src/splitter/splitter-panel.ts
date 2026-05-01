@@ -46,6 +46,15 @@ export class DuiSplitterPanelPrimitive extends LitElement {
   @property({ type: Number, attribute: "max-size" })
   accessor maxSize = 100;
 
+  /**
+   * If true, the panel auto-flips to a collapsed state (`data-collapsed`,
+   * `collapse-change` event, revivable via `expandPanel(id)`) when its
+   * size reaches ~0 via drag or keyboard nudge. Requires `min-size="0"`
+   * for drag-to-collapse to be reachable.
+   */
+  @property({ type: Boolean })
+  accessor collapsible = false;
+
   @property({ type: Number })
   accessor order: number | undefined = undefined;
 
@@ -76,6 +85,7 @@ export class DuiSplitterPanelPrimitive extends LitElement {
         changedProps.has("defaultSize") ||
         changedProps.has("minSize") ||
         changedProps.has("maxSize") ||
+        changedProps.has("collapsible") ||
         changedProps.has("order"))
     ) {
       // panelId change requires removing the old registration.
@@ -94,6 +104,7 @@ export class DuiSplitterPanelPrimitive extends LitElement {
       minSize: this.minSize,
       maxSize: this.maxSize,
       defaultSize: this.defaultSize,
+      collapsible: this.collapsible,
       order: this.order,
       el: this,
     });

@@ -16,6 +16,14 @@ export const valueChangeEvent = customEvent<number[]>("value-change", {
   composed: true,
 });
 
+export const collapseChangeEvent = customEvent<{
+  panelId: string;
+  collapsed: boolean;
+}>("collapse-change", {
+  bubbles: true,
+  composed: true,
+});
+
 const styles = css`
   :host {
     display: block;
@@ -432,11 +440,18 @@ export class DuiSplitterPrimitive extends LitElement {
     window.removeEventListener("pointerup", this.#onPointerUp);
     window.removeEventListener("pointercancel", this.#onPointerUp);
     const wasDragging = state.active;
+    const startSizes = state.startSizes;
     this.#dragState = null;
     this.#resizing = false;
     this.#draggingHandleId = undefined;
-    // Only flush save when an actual drag occurred (not a bare click).
-    if (wasDragging) this.#flushSave();
+    if (wasDragging) {
+      // Auto-collapse runs only on drag end (not during pointermove) to
+      // avoid `data-collapsed` flickering on/off as the user drags through
+      // 0. `startSizes` is the snapshot at drag start — used as the
+      // pre-collapse size to remember for `expandPanel()` restore.
+      this.#autoCollapseAtZero(startSizes);
+      this.#flushSave();
+    }
   }
 
   // ---- Public imperative API ---------------------------------------------
@@ -494,7 +509,8 @@ export class DuiSplitterPrimitive extends LitElement {
   /**
    * Restore all panels to their initial layout (the snapshot taken when
    * the current panel set was first laid out). Also clears any collapsed
-   * state.
+   * state, dispatching `collapse-change` for each previously-collapsed
+   * panel.
    */
   resetSizes(): void {
     if (this.#panelOrder.length === 0) return;
@@ -504,8 +520,10 @@ export class DuiSplitterPrimitive extends LitElement {
     // End any in-flight drag so it can't fight the reset.
     if (this.#dragState !== null) this.#endDrag();
 
-    this.#collapsed.clear();
-    this.#collapsedFrom.clear();
+    // Uncollapse everything; fires `collapse-change` per affected panel.
+    for (const id of [...this.#collapsed]) {
+      this.#flipCollapsed(id, false);
+    }
 
     const base =
       this.#initialSizes.length === panels.length
@@ -540,9 +558,11 @@ export class DuiSplitterPrimitive extends LitElement {
     const donated = current[idx];
     if (donated <= 0) {
       // Already effectively zero — just flag it.
-      this.#collapsed.add(panelId);
-      this.#collapsedFrom.set(panelId, panels[idx].defaultSize ?? 100 / panels.length);
-      this.requestUpdate();
+      this.#flipCollapsed(
+        panelId,
+        true,
+        panels[idx].defaultSize ?? 100 / panels.length,
+      );
       this.#commitSizes(
         clampToConstraints(current, panels, this.#collapsed),
       );
@@ -577,8 +597,7 @@ export class DuiSplitterPrimitive extends LitElement {
       // sort out whatever it can.
     }
 
-    this.#collapsed.add(panelId);
-    this.#collapsedFrom.set(panelId, donated);
+    this.#flipCollapsed(panelId, true, donated);
 
     this.#commitSizes(clampToConstraints(next, panels, this.#collapsed));
   }
@@ -608,8 +627,7 @@ export class DuiSplitterPrimitive extends LitElement {
       100 / panels.length;
 
     // Mark uncollapsed *before* clamp so the panel's real minSize applies.
-    this.#collapsed.delete(panelId);
-    this.#collapsedFrom.delete(panelId);
+    this.#flipCollapsed(panelId, false);
 
     const current = [...this.#getEffectiveSizes()];
     const next = [...current];
@@ -671,7 +689,12 @@ export class DuiSplitterPrimitive extends LitElement {
     // Keyboard nudges are incremental from the *current* sizes.
     const current = [...this.#getEffectiveSizes()];
     const next = this.#computeFromBaseSizes(handleId, current, deltaPct);
-    if (next) this.#commitSizes(next);
+    if (!next) return;
+    this.#commitSizes(next);
+    // Discrete commit — unlike pointermove, no flicker risk, so run the
+    // auto-collapse pass after every nudge. `current` is the pre-nudge
+    // snapshot, used as the remembered pre-collapse size.
+    this.#autoCollapseAtZero(current);
   };
 
   /**
@@ -732,12 +755,86 @@ export class DuiSplitterPrimitive extends LitElement {
 
   /** Commit a new sizes array — write to internal state if uncontrolled, dispatch event always. */
   #commitSizes(next: number[]): void {
+    // Auto-uncollapse: any panel currently flagged collapsed whose
+    // committed size has risen above the threshold (e.g. a neighbour was
+    // dragged/nudged to give it room) is no longer collapsed. Done here
+    // — not just on drag end — because a non-zero size with
+    // `data-collapsed` set would be visually inconsistent during the
+    // drag itself, and the flag flips at most once during a drag (when
+    // the panel first leaves zero), so there's no flicker concern.
+    if (this.#collapsed.size > 0) {
+      for (let i = 0; i < this.#panelOrder.length; i++) {
+        const id = this.#panelOrder[i];
+        if (this.#collapsed.has(id) && (next[i] ?? 0) > 0.01) {
+          this.#flipCollapsed(id, false);
+        }
+      }
+    }
     if (this.value === undefined) {
       this.#internalSizes = next;
       this.#scheduleSave();
     }
     this.dispatchEvent(valueChangeEvent([...next]));
     this.requestUpdate();
+  }
+
+  /**
+   * Mutate the collapsed set and dispatch `collapse-change` if the state
+   * actually changed. Single source of truth for collapsed-flag flips,
+   * shared between API (`collapsePanel`/`expandPanel`/`resetSizes`) and
+   * drag/nudge auto-collapse paths.
+   *
+   * `fromSize` is consulted only when collapsing — it's stashed in
+   * `#collapsedFrom` so a later `expandPanel(id)` can restore the panel
+   * to its pre-collapse size.
+   */
+  #flipCollapsed(
+    panelId: string,
+    collapsed: boolean,
+    fromSize?: number,
+  ): void {
+    const has = this.#collapsed.has(panelId);
+    if (has === collapsed) return;
+    if (collapsed) {
+      this.#collapsed.add(panelId);
+      if (fromSize !== undefined && fromSize > 0.01) {
+        this.#collapsedFrom.set(panelId, fromSize);
+      }
+    } else {
+      this.#collapsed.delete(panelId);
+      this.#collapsedFrom.delete(panelId);
+    }
+    this.dispatchEvent(collapseChangeEvent({ panelId, collapsed }));
+    this.requestUpdate();
+  }
+
+  /**
+   * Flip any `collapsible` panel currently at size ~0 to collapsed.
+   * Called after discrete size-committing actions (drag end, keyboard
+   * nudge) so consumers see a single clean transition rather than
+   * `data-collapsed` toggling per pointermove frame as the user drags
+   * through zero.
+   *
+   * `prevSizes`, when supplied, is the pre-action snapshot of sizes —
+   * the entry for each collapsing panel becomes its remembered
+   * pre-collapse size for `expandPanel()` restoration.
+   */
+  #autoCollapseAtZero(prevSizes?: readonly number[]): void {
+    if (this.#panelOrder.length === 0) return;
+    const sizes = this.#getEffectiveSizes();
+    for (let i = 0; i < this.#panelOrder.length; i++) {
+      const id = this.#panelOrder[i];
+      if (this.#collapsed.has(id)) continue;
+      const panel = this.#panelRegistry.get(id);
+      if (!panel?.collapsible) continue;
+      if ((sizes[i] ?? 0) >= 0.01) continue;
+      const remembered = prevSizes?.[i];
+      const fromSize =
+        remembered !== undefined && remembered > 0.01
+          ? remembered
+          : (panel.defaultSize ?? 100 / this.#panelOrder.length);
+      this.#flipCollapsed(id, true, fromSize);
+    }
   }
 
   // ---- Persistence -------------------------------------------------------
