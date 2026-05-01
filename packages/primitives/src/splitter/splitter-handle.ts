@@ -100,6 +100,23 @@ export class DuiSplitterHandlePrimitive extends LitElement {
     this._ctx.beginDrag(this.#handleId, ev);
   };
 
+  #onMouseDown = (ev: MouseEvent): void => {
+    if (this.#isDisabled()) return;
+    if (ev.button !== 0) return;
+    // Suppress the browser's default focus-on-mousedown so clicking the
+    // handle to drag doesn't steal focus from whatever the user was
+    // interacting with (e.g. a text input). Tab-to-focus still works for
+    // keyboard users.
+    //
+    // mousedown's cancellable default actions are focus shift, text
+    // selection, and native drag init — *not* click/dblclick generation,
+    // so double-click-to-reset is preserved. We deliberately do this on
+    // `mousedown` rather than `pointerdown` because cancelling pointerdown
+    // can suppress synthesized click/dblclick in WebKit (same class of
+    // issue that pushed us off `setPointerCapture()` in `#beginDrag`).
+    ev.preventDefault();
+  };
+
   #onDoubleClick = (ev: MouseEvent): void => {
     if (this.#isDisabled() || !this.#handleId || !this._ctx) return;
     ev.preventDefault();
@@ -191,6 +208,7 @@ export class DuiSplitterHandlePrimitive extends LitElement {
         ?data-dragging=${dragging}
         ?data-focused=${this.#focused}
         @pointerdown=${this.#onPointerDown}
+        @mousedown=${this.#onMouseDown}
         @dblclick=${this.#onDoubleClick}
         @keydown=${this.#onKeyDown}
         @focus=${this.#onFocus}
