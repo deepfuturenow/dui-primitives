@@ -11,11 +11,13 @@ A Tree displays hierarchical data as an expandable/collapsible list. Users navig
 ## Anatomy
 
 ```
-<dui-tree>                          ← role="tree", manages focus + keyboard
-  <dui-tree-item value="docs">      ← role="treeitem", branch (has children)
+<dui-tree>                              ← role="tree", manages focus + keyboard
+  <dui-tree-item value="docs">          ← role="treeitem", branch (has children)
     <span slot="label">Documents</span>
-    <dui-tree-item value="readme">  ← role="treeitem", leaf (no children)
+    <span slot="end">3 items</span>     ← trailing content (optional)
+    <dui-tree-item value="readme">      ← role="treeitem", leaf (no children)
       <span slot="label">README.md</span>
+      <span slot="end">✅</span>
     </dui-tree-item>
     <dui-tree-item value="license">
       <span slot="label">LICENSE</span>
@@ -75,6 +77,7 @@ Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains oth
 |---------|------|-------------|
 | `<dui-tree>` | (default) | `<dui-tree-item>` children |
 | `<dui-tree-item>` | `label` | The visible label/content for this node |
+| `<dui-tree-item>` | `end` | Trailing content (status icons, badges, actions) — rendered at the far right of the row |
 | `<dui-tree-item>` | (default) | Child `<dui-tree-item>` elements (makes it a branch) |
 
 ### CSS Parts
@@ -83,7 +86,7 @@ Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains oth
 |---------|------|-------------|
 | `<dui-tree>` | `root` | The tree container (`role="tree"`) |
 | `<dui-tree-item>` | `root` | The treeitem row |
-| `<dui-tree-item>` | `content` | Label + indicator wrapper |
+| `<dui-tree-item>` | `content` | Row layout container — `display: flex; align-items: center`. Contains indicator, label slot, and end slot. |
 | `<dui-tree-item>` | `indicator` | Expand/collapse chevron (branches only) |
 | `<dui-tree-item>` | `group` | The child group container (`role="group"`) |
 
@@ -132,13 +135,49 @@ Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains oth
 
 Focus management uses **roving tabindex**: one treeitem has `tabindex="0"`, all others have `tabindex="-1"`.
 
+### Internal render structure (`<dui-tree-item>`)
+
+```
+[part="root"]                      ← role="treeitem", data-level, data-branch|data-leaf, etc.
+  [part="content"]                  ← display: flex; align-items: center
+    [part="indicator"]              ← chevron (branches only)
+    <slot name="label">            ← label content
+    <span style="flex: 1"></span>  ← spacer pushes end slot right
+    <slot name="end">              ← trailing content (icons, badges)
+  [part="group"]                    ← role="group", hidden when collapsed
+    <slot>                          ← child <dui-tree-item> elements
+```
+
+### CSS custom properties
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `--dui-tree-level` | (set per item) | The 1-based nesting depth of the item. Set automatically by the primitive on each `<dui-tree-item>`. Use for indentation, font-size, or any level-dependent styling. |
+
+The primitive **does not apply indentation**. Consumers control it:
+
+```css
+/* Indent via padding */
+dui-tree-item::part(content) {
+  padding-inline-start: calc(var(--dui-tree-level) * 1.5rem);
+}
+
+/* Or use a different amount */
+dui-tree-item::part(content) {
+  padding-inline-start: calc(var(--dui-tree-level) * 24px);
+}
+
+/* Or no indentation at all */
+```
+
 ### Structural CSS (primitive provides)
 
 - `:host` → `display: block`
 - `[part="root"]` → `role="tree"` container, no aesthetic styles
+- `[part="content"]` → `display: flex; align-items: center` (layout for indicator + label + end)
 - `[part="group"]` → `display: none` when collapsed, `display: block` when expanded
-- `[part="indicator"]` → rotates via `data-expanded` (structural transform only)
-- Indentation via `padding-inline-start` calculated from `data-level` (CSS custom property `--dui-tree-indent`, default `1.5rem`)
+- `[part="indicator"]` → no aesthetic styles (consumer styles the chevron)
+- **No indentation** — consumer uses `--dui-tree-level` to apply their own
 
 ---
 
@@ -215,7 +254,9 @@ A `<dui-tree-item>` is a branch if it contains slotted `<dui-tree-item>` childre
 
 ---
 
-## Usage Example
+## Usage Examples
+
+### Basic file tree with status icons
 
 ```html
 <dui-tree
@@ -225,13 +266,16 @@ A `<dui-tree-item>` is a branch if it contains slotted `<dui-tree-item>` childre
 >
   <dui-tree-item value="src">
     <span slot="label">📁 src</span>
+    <span slot="end" class="badge">3 files</span>
     <dui-tree-item value="index.ts">
       <span slot="label">📄 index.ts</span>
+      <span slot="end">✅</span>
     </dui-tree-item>
     <dui-tree-item value="utils">
       <span slot="label">📁 utils</span>
       <dui-tree-item value="helpers.ts">
         <span slot="label">📄 helpers.ts</span>
+        <span slot="end">⚠️</span>
       </dui-tree-item>
     </dui-tree-item>
   </dui-tree-item>
@@ -244,9 +288,15 @@ A `<dui-tree-item>` is a branch if it contains slotted `<dui-tree-item>` childre
 </dui-tree>
 ```
 
-### Styling
+### Styling (indentation + aesthetics)
 
 ```css
+/* Indentation — consumer controls via --dui-tree-level */
+dui-tree-item::part(content) {
+  padding-inline-start: calc(var(--dui-tree-level) * 1.5rem);
+}
+
+/* Row aesthetics */
 dui-tree-item::part(root) {
   padding: 4px 8px;
   border-radius: 6px;
@@ -266,11 +316,12 @@ dui-tree-item::part(root)[data-disabled] {
   cursor: default;
 }
 
+/* Chevron rotation */
 dui-tree-item::part(indicator) {
   transition: transform 200ms ease;
 }
 
-dui-tree-item::part(root)[data-expanded] > dui-tree-item::part(indicator) {
+dui-tree-item::part(root)[data-expanded] dui-tree-item::part(indicator) {
   transform: rotate(90deg);
 }
 ```
