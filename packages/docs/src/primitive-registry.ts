@@ -161,6 +161,54 @@ export const primitiveRegistry: PrimitiveMeta[] = [
     ],
     slots: [{ name: "default", description: "Trigger and popup sub-components" }],
   },
+  {
+    tagName: "dui-tree",
+    name: "Tree",
+    description: "A hierarchical tree view with keyboard navigation and optional selection. Follows the W3C APG Treeview pattern.",
+    importPath: "@dui/primitives/tree",
+    properties: [
+      { name: "expandedValues", type: "string[] | undefined", description: "Controlled expanded branches" },
+      { name: "defaultExpandedValues", type: "string[]", default: "[]", description: "Initial expanded branches (uncontrolled)" },
+      { name: "selectionMode", type: '"none" | "single" | "multiple"', default: '"none"', description: "Selection behavior" },
+      { name: "selectedValues", type: "string[] | undefined", description: "Controlled selected items" },
+      { name: "defaultSelectedValues", type: "string[]", default: "[]", description: "Initial selected items (uncontrolled)" },
+      { name: "disabled", type: "boolean", default: "false", description: "Disables the entire tree" },
+    ],
+    events: [
+      { name: "dui-expanded-change", detail: "{ values: string[] }", description: "Branches expanded or collapsed" },
+      { name: "dui-selection-change", detail: "{ values: string[] }", description: "Selection changed" },
+      { name: "dui-action", detail: "{ value: string }", description: "Leaf activated in non-selectable tree" },
+    ],
+    slots: [{ name: "default", description: "<dui-tree-item> children" }],
+    cssParts: [{ name: "root", description: "The tree layout container" }],
+  },
+  {
+    tagName: "dui-tree-item",
+    name: "Tree Item",
+    description: "A node in a <dui-tree>. Becomes a branch automatically when it contains child <dui-tree-item> elements.",
+    importPath: "@dui/primitives/tree",
+    parent: "dui-tree",
+    properties: [
+      { name: "value", type: "string", description: "Unique identifier for this item (required)" },
+      { name: "disabled", type: "boolean", default: "false", description: "Disables this item and its descendants" },
+      { name: "hasChildren", type: "boolean", default: "false", description: "Marks the item as a branch even when no children are slotted yet (for async/lazy loading)" },
+      { name: "loading", type: "boolean", default: "false", description: "Loading async children. Reflects aria-busy and data-loading." },
+    ],
+    events: [
+      { name: "dui-load-children", detail: "{ value: string }", description: "Fired (bubbles) when a has-children branch is first expanded with no slotted children" },
+    ],
+    slots: [
+      { name: "label", description: "The visible label/content for this node" },
+      { name: "end", description: "Trailing content (icons, badges, actions)" },
+      { name: "default", description: "Child <dui-tree-item> elements (makes this item a branch)" },
+    ],
+    cssParts: [
+      { name: "root", description: "The treeitem row (role=treeitem). Contains content + group." },
+      { name: "content", description: "The row layout (indicator + label + end). Style hover/selected backgrounds HERE, not on root." },
+      { name: "indicator", description: "Expand target. Always rendered (with data-branch or data-leaf) so leaf labels align with branch labels at the same level." },
+      { name: "group", description: "Child group container (role=group), hidden when collapsed" },
+    ],
+  },
 ];
 
 /**
@@ -177,7 +225,7 @@ export const NAV_GROUPS: { label: string; slugs: string[] }[] = [
       "preview-card", "progress", "radio", "scroll-area", "select",
       "separator", "sidebar", "slider", "spinner", "split-button",
       "stepper", "switch", "tabs", "textarea", "toggle", "toggle-group",
-      "toolbar", "tooltip", "trunc",
+      "toolbar", "tooltip", "tree", "trunc",
     ],
   },
   {

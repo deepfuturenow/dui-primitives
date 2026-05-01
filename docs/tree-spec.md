@@ -37,9 +37,9 @@ Two elements:
 | Element | Role | Description |
 |---------|------|-------------|
 | `<dui-tree>` | `tree` | Root container. Owns keyboard navigation, expanded state, and selection state. |
-| `<dui-tree-item>` | `treeitem` | A node in the tree. Can be a leaf (no children) or a branch (has `<dui-tree-item>` children). |
+| `<dui-tree-item>` | `treeitem` | A node in the tree. Can be a leaf (no children) or a branch (has `<dui-tree-item>` children, or `has-children` set). |
 
-Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains other `<dui-tree-item>` elements, it's a branch.
+Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains other `<dui-tree-item>` elements (or has the `has-children` attribute), it's a branch.
 
 ---
 
@@ -56,12 +56,16 @@ Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains oth
 | `defaultSelectedValues` | `default-selected-values` | `string[]` | `[]` | Initial selected items (uncontrolled). |
 | `disabled` | `disabled` | `boolean` | `false` | Disables the entire tree. |
 
+When `selectionMode` changes at runtime, internal selection state is normalized: switching to `"none"` clears selection; switching to `"single"` trims to the first selected value. When `selectedValues` is controlled, normalization is the consumer's responsibility.
+
 ### `<dui-tree-item>` Properties
 
 | Property | Attribute | Type | Default | Description |
 |----------|-----------|------|---------|-------------|
 | `value` | `value` | `string` | *required* | Unique identifier for this item. |
 | `disabled` | `disabled` | `boolean` | `false` | Disables this item (and its descendants). |
+| `hasChildren` | `has-children` | `boolean` | `false` | Marks the item as a branch even when no children are slotted yet (for async/lazy loading). When set, the chevron renders and `dui-load-children` fires on first expand. |
+| `loading` | `loading` | `boolean` | `false` | Indicates async children are loading. Reflects `aria-busy="true"` and `data-loading` on the host. |
 
 ### Events
 
@@ -70,6 +74,7 @@ Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains oth
 | `dui-expanded-change` | `{ values: string[] }` | `<dui-tree>` | Branches expanded or collapsed. |
 | `dui-selection-change` | `{ values: string[] }` | `<dui-tree>` | Selection changed. |
 | `dui-action` | `{ value: string }` | `<dui-tree>` | User activated a leaf item (Enter/click on non-selectable tree). |
+| `dui-load-children` | `{ value: string }` | `<dui-tree-item>` | First expand of a `has-children` branch with no slotted children. Bubbles + composes — listenable at `<dui-tree>` level. Re-fires on next expand if children remained empty (e.g. after a failed fetch). |
 
 ### Slots
 
@@ -84,39 +89,47 @@ Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains oth
 
 | Element | Part | Description |
 |---------|------|-------------|
-| `<dui-tree>` | `root` | The tree container (`role="tree"`) |
-| `<dui-tree-item>` | `root` | The treeitem row |
-| `<dui-tree-item>` | `content` | Row layout container — `display: flex; align-items: center`. Contains indicator, label slot, and end slot. |
-| `<dui-tree-item>` | `indicator` | Expand/collapse chevron (branches only) |
-| `<dui-tree-item>` | `group` | The child group container (`role="group"`) |
+| `<dui-tree>` | `root` | The tree layout container. (`role="tree"` is on the host element so consumer-provided `aria-label` applies naturally.) |
+| `<dui-tree-item>` | `root` | The treeitem row container. **Wraps both the row content and the children group**, so styling `:hover` here will bleed onto descendants. Style `::part(content)` instead. |
+| `<dui-tree-item>` | `content` | Row layout container — `display: flex; align-items: center`. Contains indicator, label slot, and end slot. **Style hover/selected backgrounds here**, not on root. |
+| `<dui-tree-item>` | `indicator` | Expand/collapse chevron target. **Always rendered** (for both branches and leaves) so leaf labels align with branch labels at the same level. Use `[data-branch]` on the host to add chevron content; leaves render an empty placeholder. |
+| `<dui-tree-item>` | `group` | The child group container (`role="group"`, hidden when collapsed). |
 
-### Data Attributes (on `part="root"`)
+### Data Attributes
+
+State attributes are reflected to **both `[part="root"]` AND the host element**. Use the host attribute when combining with `::part(content)`:
+
+```css
+dui-tree-item[data-selected]::part(content) { background: #dbeafe; }
+```
 
 | Attribute | When present |
 |-----------|-------------|
 | `data-expanded` | Branch is expanded |
 | `data-selected` | Item is selected |
-| `data-disabled` | Item is disabled |
-| `data-branch` | Item has children (is a branch) |
-| `data-leaf` | Item has no children (is a leaf) |
+| `data-disabled` | Item is disabled (own attr OR ancestor disabled OR tree disabled) |
+| `data-branch` | Item has children (slotted, or `has-children` set) |
+| `data-leaf` | Item has no children |
 | `data-level` | Nesting depth (1-based). e.g. `data-level="2"` |
 | `data-focus` | Item has keyboard focus |
+| `data-loading` | Item is loading async children |
 
 ### ARIA Mapping (per W3C APG)
 
 | Element | ARIA | Source |
 |---------|------|--------|
-| `<dui-tree>` root | `role="tree"` | Static |
-| `<dui-tree>` root | `aria-label` or `aria-labelledby` | Consumer provides via attribute |
-| `<dui-tree>` root | `aria-multiselectable="true"` | When `selectionMode="multiple"` |
+| `<dui-tree>` host | `role="tree"` | Set automatically in `connectedCallback` |
+| `<dui-tree>` host | `aria-label` or `aria-labelledby` | Consumer provides via attribute on the host |
+| `<dui-tree>` host | `aria-multiselectable="true"` | When `selectionMode="multiple"` |
 | `<dui-tree-item>` root | `role="treeitem"` | Static |
 | `<dui-tree-item>` root | `aria-expanded="true/false"` | Branches only; reflects expanded state |
 | `<dui-tree-item>` root | `aria-selected="true/false"` | When `selectionMode !== "none"` |
 | `<dui-tree-item>` root | `aria-disabled="true"` | When disabled |
+| `<dui-tree-item>` root | `aria-busy="true"` | When `loading` is set |
 | `<dui-tree-item>` root | `aria-level` | Nesting depth (1-based) |
 | `<dui-tree-item>` root | `aria-setsize` | Number of siblings at this level |
 | `<dui-tree-item>` root | `aria-posinset` | Position among siblings (1-based) |
-| `<dui-tree-item>` group | `role="group"` | Container for child treeitems |
+| `<dui-tree-item>` group | `role="group"` | Container for child treeitems (branches only) |
 
 ### Keyboard Interaction (W3C APG)
 
@@ -133,18 +146,22 @@ Branch vs. leaf is determined automatically: if a `<dui-tree-item>` contains oth
 | `*` (asterisk) | Expand all sibling branches at the focused item's level |
 | Type-ahead | Move focus to next item starting with typed character(s) |
 
-Focus management uses **roving tabindex**: one treeitem has `tabindex="0"`, all others have `tabindex="-1"`.
+Focus management uses **roving tabindex**: one treeitem has `tabindex="0"`, all others have `tabindex="-1"`. On first render, the first non-disabled visible item becomes the tab stop. The tree's `MutationObserver` re-runs the init for late-arriving items (async loading).
 
 ### Internal render structure (`<dui-tree-item>`)
 
 ```
 [part="root"]                      ← role="treeitem", data-level, data-branch|data-leaf, etc.
+                                     Wraps both content AND group — DO NOT style :hover here.
   [part="content"]                  ← display: flex; align-items: center
-    [part="indicator"]              ← chevron (branches only)
+    [part="indicator"]              ← ALWAYS rendered (data-branch | data-leaf | data-loading).
+                                     For branches, click toggles expand. For leaves, click bubbles
+                                     to row handler. Width is consumer's choice (always reserved
+                                     so leaf and branch labels align at the same level).
     <slot name="label">            ← label content
     <span style="flex: 1"></span>  ← spacer pushes end slot right
     <slot name="end">              ← trailing content (icons, badges)
-  [part="group"]                    ← role="group", hidden when collapsed
+  [part="group"]                    ← role="group" (branches only), hidden when collapsed
     <slot>                          ← child <dui-tree-item> elements
 ```
 
@@ -154,30 +171,61 @@ Focus management uses **roving tabindex**: one treeitem has `tabindex="0"`, all 
 |----------|---------|-------------|
 | `--dui-tree-level` | (set per item) | The 1-based nesting depth of the item. Set automatically by the primitive on each `<dui-tree-item>`. Use for indentation, font-size, or any level-dependent styling. |
 
-The primitive **does not apply indentation**. Consumers control it:
+The primitive **does not apply indentation**. Consumers control it on `[part="content"]` (NOT `[part="root"]`, which contains the children group):
 
 ```css
-/* Indent via padding */
 dui-tree-item::part(content) {
-  padding-inline-start: calc(var(--dui-tree-level) * 1.5rem);
+  padding-inline-start: calc((var(--dui-tree-level) - 1) * 22px);
 }
-
-/* Or use a different amount */
-dui-tree-item::part(content) {
-  padding-inline-start: calc(var(--dui-tree-level) * 24px);
-}
-
-/* Or no indentation at all */
 ```
 
 ### Structural CSS (primitive provides)
 
 - `:host` → `display: block`
-- `[part="root"]` → `role="tree"` container, no aesthetic styles
+- `[part="root"]` → no aesthetic styles, just `outline: none` for focus management
 - `[part="content"]` → `display: flex; align-items: center` (layout for indicator + label + end)
-- `[part="group"]` → `display: none` when collapsed, `display: block` when expanded
-- `[part="indicator"]` → no aesthetic styles (consumer styles the chevron)
+- `[part="group"]` → `display: none` when collapsed (via `[hidden]`)
+- `[part="indicator"]` → `display: inline-flex` for centering, no aesthetic sizing
 - **No indentation** — consumer uses `--dui-tree-level` to apply their own
+
+### Recommended consumer styling pattern
+
+```css
+/* 1. Indent the row, NOT the host. (level - 1) gives 0 for top-level. */
+dui-tree-item::part(content) {
+  padding-block: 4px;
+  padding-inline-start: calc(8px + (var(--dui-tree-level) - 1) * 22px);
+  padding-inline-end: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  gap: 6px;
+}
+
+/* 2. Reserve indicator space for ALL items so labels align at the same level. */
+dui-tree-item::part(indicator) {
+  width: 16px;
+  height: 16px;
+}
+
+/* 3. Add chevron content via [data-branch] on the host. */
+dui-tree-item[data-branch]::part(indicator)::before {
+  content: "▸";
+  transition: transform 200ms ease;
+}
+dui-tree-item[data-expanded]::part(indicator)::before {
+  transform: rotate(90deg);
+}
+
+/* 4. Style ::part(content) for hover and selection — NOT ::part(root).
+      [part="root"] contains the children group; styling :hover on it would
+      bleed the highlight onto every descendant row. */
+dui-tree-item::part(content):hover         { background: #f3f4f6; }
+dui-tree-item[data-selected]::part(content){ background: #dbeafe; }
+dui-tree-item[data-disabled]::part(content){ opacity: 0.45; cursor: not-allowed; }
+dui-tree-item[data-focus]::part(content)   { outline: 2px solid #3b82f6; outline-offset: -2px; }
+```
+
+> **Browser support note:** `::part(name)::before` requires Chrome 90+, Safari 16.4+, Firefox 128+ (July 2024). For older Firefox, use a `mask-image` or `background-image` SVG on `::part(indicator)` instead.
 
 ---
 
@@ -185,35 +233,59 @@ dui-tree-item::part(content) {
 
 These features are **not in v1** but the architecture should not preclude them.
 
-### Async loading
-- `loading` property on `<dui-tree-item>` to show a spinner while children load
-- `dui-load-children` event fired when a branch is first expanded and has no children
-- Consumers handle the event, fetch data, and append `<dui-tree-item>` elements
-
 ### Drag and drop
-- Reordering items within the tree
-- Moving items between branches
-- Drop indicators (before, after, inside)
-- Integration with the platform Drag and Drop API
+
+**Goal:** Reorder items within a tree, move items between branches, drop external items into a tree.
+
+**Plan:**
+- Use the platform [Drag and Drop API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API).
+- Add a `draggable` boolean property to `<dui-tree-item>` (default `false`).
+- Tree dispatches `dui-drag-start`, `dui-drag-over`, `dui-drop` events with payload `{ source: TreeItem, target: TreeItem, position: "before" | "after" | "inside" }`.
+- Consumer is responsible for the actual reorder/move (mutates the data → re-renders → tree updates).
+- `[part="indicator"]` reused or new `[part="drop-indicator"]` part for visual drop targets.
+- Position is computed from cursor Y relative to the target row (top third = `before`, middle = `inside`, bottom third = `after`).
+- Auto-scroll when dragging near top/bottom of a scrollable tree container.
+- Auto-expand branches after a hover delay (~700ms).
+
+**Open questions:**
+- Should the primitive prevent invalid drops (e.g. dropping an ancestor onto its descendant)? Lean: yes, by default, with an opt-out.
+- Multi-select drag (drag multiple selected items)? Yes if `selectionMode="multiple"` and the dragged item is selected.
 
 ### Virtualization
-- Only render visible items for large trees (1000+ nodes)
-- Requires measuring row heights and managing a scroll viewport
+
+**Goal:** Handle trees with 10k+ nodes without rendering them all.
+
+**Plan:**
+- New `virtual` boolean attribute on `<dui-tree>`. When set, switches to a windowed render strategy.
+- The data model shifts from "DOM-as-source-of-truth" to "data-as-source-of-truth": consumer provides items via a `data` property (array or async iterator), and the primitive renders only visible rows.
+- Today's slot-based API becomes opt-out: `<dui-tree virtual .data=${tree}>` instead of declarative `<dui-tree-item>` children.
+- Use a fixed row height (configurable via `--dui-tree-row-height`) for simplicity in v2.1; variable heights with measured rows in v2.2.
+- Implementation: scroll listener + intersection observer, render-window of `bufferStart..bufferEnd` items.
+- ARIA: `aria-setsize` and `aria-posinset` come from data, not DOM. `aria-rowcount` / `aria-rowindex` may be needed.
+- Keyboard navigation operates on the data model, not the DOM.
+
+**Open questions:**
+- API for tree data: flat list with parent ids, or nested? Lean: nested (matches DOM mental model).
+- How does it interact with async loading? Lazy expansion still works — `dui-load-children` fires when the windowed render reaches an unloaded branch.
+
+### Async loading (DELIVERED in Phase 1)
+
+`hasChildren` + `loading` properties on `<dui-tree-item>`, plus the `dui-load-children` event. See Phase 1 sections above.
 
 ### Checkbox selection (mixed/tri-state)
-- Parent checkboxes show indeterminate state when only some children are selected
-- `selectionMode="checkbox"` with visible checkbox in each row
+- Parent checkboxes show indeterminate state when only some children are selected.
+- `selectionMode="checkbox"` with visible checkbox in each row (or via a new `[part="checkbox"]` slot).
 
 ### Inline editing
-- Double-click or F2 to edit item labels in-place
-- `dui-rename` event with old/new values
+- Double-click or F2 to edit item labels in-place.
+- `dui-rename` event with old/new values.
 
 ### Context menu
-- Right-click or Shift+F10 to open a context menu on an item
-- Integration with `<dui-menu>`
+- Right-click or Shift+F10 to open a context menu on an item.
+- Integration with `<dui-menu>`.
 
 ### Filtering / search
-- Filter tree items by text, collapsing branches with no matching descendants
+- Filter tree items by text, collapsing branches with no matching descendants.
 
 ---
 
@@ -223,34 +295,48 @@ These features are **not in v1** but the architecture should not preclude them.
 
 Follows the same Lit Context pattern as Accordion:
 
-- `<dui-tree>` provides a `treeContext` with expanded/selected state + callbacks
-- `<dui-tree-item>` consumes context, calls `ctx.toggle(value)`, `ctx.select(value)`, etc.
-- State lives in `<dui-tree>`, items are stateless renderers
+- `<dui-tree>` provides a `treeContext` with expanded/selected state + callbacks.
+- `<dui-tree-item>` consumes context, calls `ctx.toggleExpand(value)`, `ctx.activate(value, isBranch)`, etc.
+- State lives in `<dui-tree>`, items are stateless renderers.
+
+### Click bubbling between nested items
+
+Nested tree-items are slotted into ancestor items' shadow DOM. A click on a child's `[part="root"]` bubbles through the slot composition into the ancestor's `[part="root"]` click handler. The item's row click handler calls `e.stopPropagation()` to prevent this. The indicator click handler does the same so expanding a branch doesn't also fire its row's `activate`.
+
+### Disabled propagation
+
+A `<dui-tree-item>` is effectively disabled if **any** of these are true:
+- Own `disabled` attribute is set.
+- The tree is `disabled`.
+- Any ancestor `<dui-tree-item>` has `disabled` set.
+
+The item walks up the DOM in `#isDisabled` to check ancestors. The parent tree uses a `MutationObserver` watching descendant `disabled` attribute changes to trigger a context rebuild, which re-renders all items so they re-evaluate.
 
 ### Nesting depth
 
-`<dui-tree-item>` calculates its own level by walking up the DOM:
-
-```ts
-get #level(): number {
-  let level = 1;
-  let el = this.parentElement;
-  while (el) {
-    if (el instanceof DuiTreeItemPrimitive) level++;
-    if (el instanceof DuiTreePrimitive) break;
-    el = el.parentElement;
-  }
-  return level;
-}
-```
+`<dui-tree-item>` calculates its own level by walking up the DOM, counting `DUI-TREE-ITEM` ancestors and stopping at the `DUI-TREE` root.
 
 ### Visible items for keyboard navigation
 
-`<dui-tree>` builds a flat list of currently visible treeitems (expanded branches contribute their children to the list). This list is rebuilt when expanded state changes and is used for arrow key navigation.
+`<dui-tree>` builds a flat list of currently visible treeitems via `querySelectorAll("dui-tree-item")` filtered by ancestor expanded state. Rebuilt on each keystroke (cheap for typical trees; revisit for virtualization).
 
 ### Branch detection
 
-A `<dui-tree-item>` is a branch if it contains slotted `<dui-tree-item>` children. Detected via `slotchange` event on the default slot. This determines whether to render `[part="indicator"]` and set `aria-expanded`.
+A `<dui-tree-item>` is a branch if:
+- It has slotted `<dui-tree-item>` children (detected via `slotchange` on the default slot), OR
+- The `has-children` attribute is set (for async loading).
+
+The indicator part is **always rendered**, with `data-branch` / `data-leaf` differentiation. This keeps leaf and branch labels horizontally aligned at the same nesting level when the consumer reserves indicator width.
+
+### State attribute reflection
+
+State attributes (`data-expanded`, `data-selected`, `data-disabled`, `data-branch`, `data-leaf`, `data-focus`, `data-loading`, `data-level`) are reflected to **both `[part="root"]` AND the host element** in `updated()`. The host reflection enables the primary styling pattern:
+
+```css
+dui-tree-item[data-selected]::part(content) { ... }
+```
+
+CSS does not allow chaining `::part()` selectors (`::part(root)[data-selected]::part(content)` is invalid), so the host attribute is the only way to combine "this item is in state X" with "style this part of it".
 
 ---
 
@@ -275,53 +361,58 @@ A `<dui-tree-item>` is a branch if it contains slotted `<dui-tree-item>` childre
       <span slot="label">📁 utils</span>
       <dui-tree-item value="helpers.ts">
         <span slot="label">📄 helpers.ts</span>
-        <span slot="end">⚠️</span>
       </dui-tree-item>
     </dui-tree-item>
   </dui-tree-item>
   <dui-tree-item value="package.json">
     <span slot="label">📄 package.json</span>
   </dui-tree-item>
-  <dui-tree-item value="README.md">
-    <span slot="label">📄 README.md</span>
-  </dui-tree-item>
 </dui-tree>
 ```
 
-### Styling (indentation + aesthetics)
+### Async loading
 
-```css
-/* Indentation — consumer controls via --dui-tree-level */
-dui-tree-item::part(content) {
-  padding-inline-start: calc(var(--dui-tree-level) * 1.5rem);
-}
+```html
+<dui-tree aria-label="Remote files">
+  <dui-tree-item value="remote-root" has-children>
+    <span slot="label">📁 remote/</span>
+  </dui-tree-item>
+</dui-tree>
 
-/* Row aesthetics */
-dui-tree-item::part(root) {
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-}
+<script>
+  const tree = document.querySelector("dui-tree");
+  tree.addEventListener("dui-load-children", async (e) => {
+    const item = e.target;
+    item.loading = true;
+    const children = await fetch(`/api/tree/${e.detail.value}`).then(r => r.json());
+    for (const c of children) {
+      const el = document.createElement("dui-tree-item");
+      el.value = c.id;
+      if (c.hasChildren) el.hasChildren = true;
+      el.innerHTML = `<span slot="label">${c.label}</span>`;
+      item.appendChild(el);
+    }
+    item.loading = false;
+  });
+</script>
+```
 
-dui-tree-item::part(root):hover {
-  background: #f3f4f6;
-}
+### Controlled mode
 
-dui-tree-item::part(root)[data-selected] {
-  background: #dbeafe;
-}
+```html
+<dui-tree id="t" selection-mode="single">
+  <dui-tree-item value="a">
+    <span slot="label">A</span>
+    <dui-tree-item value="a-1"><span slot="label">A.1</span></dui-tree-item>
+  </dui-tree-item>
+</dui-tree>
 
-dui-tree-item::part(root)[data-disabled] {
-  opacity: 0.5;
-  cursor: default;
-}
+<script>
+  const tree = document.getElementById("t");
+  tree.expandedValues = ["a"];
+  tree.selectedValues = ["a-1"];
 
-/* Chevron rotation */
-dui-tree-item::part(indicator) {
-  transition: transform 200ms ease;
-}
-
-dui-tree-item::part(root)[data-expanded] dui-tree-item::part(indicator) {
-  transform: rotate(90deg);
-}
+  tree.addEventListener("dui-expanded-change", e => tree.expandedValues = e.detail.values);
+  tree.addEventListener("dui-selection-change", e => tree.selectedValues = e.detail.values);
+</script>
 ```

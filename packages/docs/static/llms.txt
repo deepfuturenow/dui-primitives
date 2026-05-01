@@ -72,3 +72,18 @@ Import: import { DuiButtonPrimitive } from "@dui/primitives/button";
 - Properties: open (boolean, false), placement (string, "top"), delay (number, 300)
 - Events: open-change (boolean)
 - Slots: default (Trigger and popup sub-components)
+
+### Tree
+- Tag: `<dui-tree>`
+- Import: `@dui/primitives/tree`
+- Description: A hierarchical tree view with keyboard navigation and optional selection. Follows the W3C APG Treeview pattern.
+- Properties: expandedValues (string[] | undefined), defaultExpandedValues (string[], []), selectionMode ("none" | "single" | "multiple", "none"), selectedValues (string[] | undefined), defaultSelectedValues (string[], []), disabled (boolean, false)
+- Events: dui-expanded-change ({ values: string[] }), dui-selection-change ({ values: string[] }), dui-action ({ value: string })
+- Slots: default (<dui-tree-item> children)
+
+### Tree Item
+- Tag: `<dui-tree-item>`
+- Import: `@dui/primitives/tree`
+- Description: A node in a <dui-tree>. Becomes a branch automatically when it contains child <dui-tree-item> elements.
+- Properties: value (string), disabled (boolean, false)
+- Slots: label (The visible label/content for this node), end (Trailing content (icons, badges, actions)), default (Child <dui-tree-item> elements (makes this item a branch))

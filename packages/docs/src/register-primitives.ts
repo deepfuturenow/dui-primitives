@@ -45,6 +45,7 @@ import { DuiTextareaPrimitive } from "@dui/primitives/textarea";
 import { DuiTogglePrimitive, DuiToggleGroupPrimitive } from "@dui/primitives/toggle";
 import { DuiToolbarPrimitive } from "@dui/primitives/toolbar";
 import { DuiTooltipPrimitive, DuiTooltipPopupPrimitive, DuiTooltipTriggerPrimitive } from "@dui/primitives/tooltip";
+import { DuiTreePrimitive, DuiTreeItemPrimitive } from "@dui/primitives/tree";
 import { DuiTruncPrimitive } from "@dui/primitives/trunc";
 
 /** Register a primitive if not already defined. */
@@ -143,6 +144,8 @@ reg(DuiToolbarPrimitive);
 reg(DuiTooltipPrimitive);
 reg(DuiTooltipPopupPrimitive);
 reg(DuiTooltipTriggerPrimitive);
+reg(DuiTreePrimitive);
+reg(DuiTreeItemPrimitive);
 reg(DuiTruncPrimitive);
 
 console.log("[dui-primitives] All primitives registered");
