@@ -1,6 +1,6 @@
 {
   "name": "@dui/primitives",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "exports": {
     "./button": "./src/button/index.ts",
     "./switch": "./src/switch/index.ts",
