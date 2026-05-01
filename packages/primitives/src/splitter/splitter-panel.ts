@@ -103,12 +103,14 @@ export class DuiSplitterPanelPrimitive extends LitElement {
   override render(): TemplateResult {
     const size = this._ctx?.getPanelSize(this.panelId) ?? 0;
     const orientation = this._ctx?.orientation ?? "horizontal";
+    const collapsed = this._ctx?.isPanelCollapsed(this.panelId) ?? false;
 
     // Apply size as flex-basis on the host. Using `style` attribute on host
     // via inline style on the host element is not possible from inside
     // shadow DOM — set it directly on `this`.
     if (this.isConnected) {
       this.style.flexBasis = `${size}%`;
+      this.toggleAttribute("data-collapsed", collapsed);
     }
 
     return html`
@@ -116,6 +118,7 @@ export class DuiSplitterPanelPrimitive extends LitElement {
         part="root"
         data-orientation=${orientation}
         data-panel-id=${this.panelId}
+        ?data-collapsed=${collapsed}
       >
         <slot></slot>
       </div>

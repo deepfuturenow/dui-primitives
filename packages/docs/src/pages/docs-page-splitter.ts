@@ -1,5 +1,6 @@
 import { html, LitElement } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, query, state } from "lit/decorators.js";
+import type { DuiSplitterPrimitive } from "@dui/primitives/splitter";
 
 @customElement("docs-page-splitter")
 export class DocsPageSplitter extends LitElement {
@@ -21,8 +22,11 @@ export class DocsPageSplitter extends LitElement {
 
   // ── Auto-save demo: clear stored layout ────────────────────────────────
   #clearAutoSave = (): void => {
+    this.#clearStoredLayout("dui-splitter:docs-splitter-demo:");
+  };
+
+  #clearStoredLayout(prefix: string): void {
     try {
-      const prefix = "dui-splitter:docs-splitter-demo:";
       const keys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -33,6 +37,47 @@ export class DocsPageSplitter extends LitElement {
     } catch {
       // ignore
     }
+  }
+
+  // ── Programmatic API demo ────────────────────────────────────
+  @query("#prog-splitter")
+  accessor #progSplitter!: DuiSplitterPrimitive;
+
+  @state() accessor #progSizes: number[] = [25, 50, 25];
+  @state() accessor #progCollapsed: string[] = [];
+
+  #onProgChange = (ev: Event): void => {
+    const detail = (ev as CustomEvent<number[]>).detail;
+    this.#progSizes = detail.map((n) => Math.round(n * 10) / 10);
+    // The collapsed-state mirror is read off the element itself — it's
+    // local to the splitter, not part of value-change.
+    const splitter = this.#progSplitter;
+    if (splitter) {
+      this.#progCollapsed = ["a", "b", "c"].filter((id) =>
+        splitter.isPanelCollapsed(id),
+      );
+    }
+  };
+
+  #progCollapse = (id: string) => () => this.#progSplitter?.collapsePanel(id);
+  #progExpand = (id: string) => () => this.#progSplitter?.expandPanel(id);
+  #progReset = () => this.#progSplitter?.resetSizes();
+  #progSetEqual = () => this.#progSplitter?.setSizes([33.33, 33.34, 33.33]);
+  #progSetWide = () => this.#progSplitter?.setSizes([10, 80, 10]);
+
+  // ── Auto-save with collapse ──────────────────────────────────
+  @query("#persist-splitter")
+  accessor #persistSplitter!: DuiSplitterPrimitive;
+
+  #persistToggleSidebar = (): void => {
+    const s = this.#persistSplitter;
+    if (!s) return;
+    if (s.isPanelCollapsed("sidebar")) s.expandPanel("sidebar");
+    else s.collapsePanel("sidebar");
+  };
+
+  #clearPersistAutoSave = (): void => {
+    this.#clearStoredLayout("dui-splitter:docs-splitter-collapse:");
   };
 
   override render() {
@@ -369,7 +414,88 @@ export class DocsPageSplitter extends LitElement {
         </div>
       </prim-demo>
 
-      <!-- ─────────────────── 9. Nested splitters ─────────────── -->
+      <!-- ─────────────────── 9. Programmatic API ─────────────── -->
+      <prim-demo
+        label="Programmatic API — collapsePanel / expandPanel / setSizes / resetSizes"
+      >
+        <div class="splitter-readout" style="margin-bottom: 8px;">
+          The splitter element exposes imperative methods for layout
+          control. <code>collapsePanel(id)</code> forces a panel to size 0
+          (bypassing its <code>min-size</code>) and donates the space to a
+          neighbor; <code>expandPanel(id)</code> reverses it.
+          <code>setSizes(arr)</code> assigns sizes wholesale (works in
+          uncontrolled mode — no need to mirror via <code>.value</code>).
+          <code>resetSizes()</code> restores the layout active when the
+          panel set first mounted and clears any collapsed panels.
+        </div>
+        <div class="demo-controls">
+          <button @click=${this.#progCollapse("a")}>Collapse A</button>
+          <button @click=${this.#progExpand("a")}>Expand A</button>
+          <button @click=${this.#progCollapse("c")}>Collapse C</button>
+          <button @click=${this.#progExpand("c")}>Expand C</button>
+          <button @click=${this.#progSetEqual}>setSizes equal</button>
+          <button @click=${this.#progSetWide}>setSizes 10 / 80 / 10</button>
+          <button @click=${this.#progReset}>resetSizes</button>
+        </div>
+        <div class="splitter-demo">
+          <dui-splitter
+            id="prog-splitter"
+            .defaultValue=${[25, 50, 25]}
+            @value-change=${this.#onProgChange}
+          >
+            <dui-splitter-panel panel-id="a" min-size="15">
+              A · min 15%
+            </dui-splitter-panel>
+            <dui-splitter-handle></dui-splitter-handle>
+            <dui-splitter-panel panel-id="b" min-size="20">
+              B · min 20%
+            </dui-splitter-panel>
+            <dui-splitter-handle></dui-splitter-handle>
+            <dui-splitter-panel panel-id="c" min-size="15">
+              C · min 15%
+            </dui-splitter-panel>
+          </dui-splitter>
+        </div>
+        <div class="splitter-readout">
+          sizes = [${this.#progSizes.map((n) => n.toFixed(1)).join(", ")}]
+          · collapsed = [${
+            this.#progCollapsed.length === 0
+              ? "—"
+              : this.#progCollapsed.join(", ")
+          }]
+        </div>
+      </prim-demo>
+
+      <!-- ───────────── 10. Auto-save with collapse ───────────── -->
+      <prim-demo
+        label="Auto-save with collapse — collapse the sidebar, then reload. Both sizes and collapsed state persist."
+      >
+        <div class="demo-controls">
+          <button @click=${this.#persistToggleSidebar}>
+            Toggle sidebar collapse
+          </button>
+          <button @click=${this.#clearPersistAutoSave}>
+            Clear saved layout & reload
+          </button>
+        </div>
+        <div class="splitter-demo">
+          <dui-splitter
+            id="persist-splitter"
+            auto-save-id="docs-splitter-collapse"
+            .defaultValue=${[20, 80]}
+          >
+            <dui-splitter-panel panel-id="sidebar" min-size="15">
+              Sidebar
+            </dui-splitter-panel>
+            <dui-splitter-handle></dui-splitter-handle>
+            <dui-splitter-panel panel-id="main">
+              Main
+            </dui-splitter-panel>
+          </dui-splitter>
+        </div>
+      </prim-demo>
+
+      <!-- ─────────────────── 11. Nested splitters ─────────────── -->
       <prim-demo
         label="Nested splitters — horizontal containing a vertical (IDE layout)"
       >

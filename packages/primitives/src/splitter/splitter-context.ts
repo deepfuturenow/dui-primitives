@@ -33,6 +33,7 @@ export interface SplitterContext {
   readonly registerPanel: (meta: SplitterPanelMeta) => void;
   readonly unregisterPanel: (id: string) => void;
   readonly getPanelSize: (id: string) => number;
+  readonly isPanelCollapsed: (id: string) => boolean;
 
   // Handle API
   readonly registerHandle: (meta: SplitterHandleMeta) => string;
