@@ -375,7 +375,20 @@ export class DuiSplitterPrimitive extends LitElement {
 
     const rect = this.getBoundingClientRect();
     const isHorizontal = this.orientation === "horizontal";
-    const rootSize = isHorizontal ? rect.width : rect.height;
+    const rootRect = isHorizontal ? rect.width : rect.height;
+    if (rootRect <= 0) return;
+
+    // Panels share `container - sum(handles)` (grow-based layout in
+    // splitter-panel.ts), so the drag math must use the same budget.
+    // Without this subtraction, percentage deltas applied to panel pixel
+    // sizes would under-shoot pointer movement and the cursor would drift
+    // away from the handle during long drags.
+    let totalHandleSize = 0;
+    for (const meta of this.#handleRegistry.values()) {
+      const r = meta.el.getBoundingClientRect();
+      totalHandleSize += isHorizontal ? r.width : r.height;
+    }
+    const rootSize = rootRect - totalHandleSize;
     if (rootSize <= 0) return;
 
     this.#dragState = {

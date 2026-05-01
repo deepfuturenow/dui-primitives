@@ -116,11 +116,19 @@ export class DuiSplitterPanelPrimitive extends LitElement {
     const orientation = this._ctx?.orientation ?? "horizontal";
     const collapsed = this._ctx?.isPanelCollapsed(this.panelId) ?? false;
 
-    // Apply size as flex-basis on the host. Using `style` attribute on host
-    // via inline style on the host element is not possible from inside
-    // shadow DOM — set it directly on `this`.
+    // Apply size as a flex-grow factor on the host. We deliberately use
+    // grow-based sizing (`${size} 1 0`) rather than `flex-basis: ${size}%`
+    // so that the space taken by handles is automatically subtracted from
+    // the panel budget. With basis-percent sizing, panels summing to 100%
+    // plus N-1 handles would always overflow the container by the total
+    // handle width — visible most starkly when a panel hits 0 and the
+    // adjacent handle gets pushed past the trailing edge of the splitter.
+    // With grow-based sizing, panels share `container - handles` exactly.
+    //
+    // Inline style on the host element from inside shadow DOM isn't
+    // possible via the `style` attribute, so we set it on `this` directly.
     if (this.isConnected) {
-      this.style.flexBasis = `${size}%`;
+      this.style.flex = `${size} 1 0`;
       this.toggleAttribute("data-collapsed", collapsed);
     }
 
