@@ -54,7 +54,7 @@ export class DuiSidebarProviderPrimitive extends LitElement {
 
   /** How the sidebar collapses. */
   @property({ reflect: true })
-  accessor collapsible: "offcanvas" | "icon" | "none" = "offcanvas";
+  accessor collapsible: "offcanvas" | "icon" | "none" | "always" = "offcanvas";
 
   @state()
   accessor #internalOpen = true;
@@ -127,15 +127,20 @@ export class DuiSidebarProviderPrimitive extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
 
-    if (this.open === undefined) {
-      this.#internalOpen = this.defaultOpen;
+    if (this.collapsible === "always") {
+      // Always-overlay mode: skip media query, force mobile path
+      this.#isMobile = true;
+    } else {
+      if (this.open === undefined) {
+        this.#internalOpen = this.defaultOpen;
+      }
+
+      this.#mediaQuery = matchMedia("(min-width: 768px)");
+      this.#isMobile = !this.#mediaQuery.matches;
+
+      this.#boundOnMediaChange = this.#onMediaChange.bind(this);
+      this.#mediaQuery.addEventListener("change", this.#boundOnMediaChange);
     }
-
-    this.#mediaQuery = matchMedia("(min-width: 768px)");
-    this.#isMobile = !this.#mediaQuery.matches;
-
-    this.#boundOnMediaChange = this.#onMediaChange.bind(this);
-    this.#mediaQuery.addEventListener("change", this.#boundOnMediaChange);
 
     this.#boundOnKeyDown = this.#onKeyDown.bind(this);
     document.addEventListener("keydown", this.#boundOnKeyDown);
