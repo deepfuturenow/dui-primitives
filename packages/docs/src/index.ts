@@ -16,4 +16,5 @@ import "./pages/docs-page-input.ts";
 import "./pages/docs-page-tooltip.ts";
 import "./pages/docs-page-tree.ts";
 import "./pages/docs-page-splitter.ts";
+import "./pages/docs-page-popover.ts";
 import "./pages/docs-page-toast.ts";

@@ -117,6 +117,33 @@ Import: import { DuiButtonPrimitive } from "@dui/primitives/button";
 - Events: dui-load-children ({ value: string })
 - Slots: label (The visible label/content for this node), end (Trailing content (icons, badges, actions)), default (Child <dui-tree-item> elements (makes this item a branch))
 
+### Popover
+- Tag: `<dui-popover>`
+- Import: `@dui/primitives/popover`
+- Description: A floating panel anchored to a trigger element. Uses Floating UI for positioning.
+- Properties: open (boolean, false), defaultOpen (boolean, false), side ("top" | "bottom", "bottom"), sideOffset (number, 8)
+- Events: open-change ({ open: boolean })
+- Slots: default (dui-popover-trigger and dui-popover-popup)
+
+### Popover Trigger
+- Tag: `<dui-popover-trigger>`
+- Import: `@dui/primitives/popover`
+- Description: The element that toggles the popover.
+- Slots: default (Trigger content (button, link, etc.))
+
+### Popover Popup
+- Tag: `<dui-popover-popup>`
+- Import: `@dui/primitives/popover`
+- Description: The floating popover content container.
+- Properties: showArrow (boolean, true), closeOnClick (boolean, false)
+- Slots: default (Popover content)
+
+### Popover Close
+- Tag: `<dui-popover-close>`
+- Import: `@dui/primitives/popover`
+- Description: A button that closes the popover.
+- Slots: default (Close button content)
+
 ### Splitter
 - Tag: `<dui-splitter>`
 - Import: `@dui/primitives/splitter`

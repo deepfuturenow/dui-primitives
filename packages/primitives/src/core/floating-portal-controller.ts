@@ -279,6 +279,7 @@ export class FloatingPortalController implements ReactiveController {
 
     const positioner = document.createElement("div");
     positioner.style.position = "fixed";
+    positioner.style.display = "block";
     positioner.style.zIndex = "1000";
     positioner.style.pointerEvents = "none";
     positioner.setAttribute("data-floating-portal", "");
