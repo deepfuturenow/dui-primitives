@@ -270,7 +270,7 @@ export class FloatingPortalController implements ReactiveController {
 
   #createPositioner(): void {
     if (this.#positioner) {
-      this.#positioner.style.display = "";
+      this.#positioner.style.display = "block";
       this.#applyForwardedProperties(this.#positioner);
       return;
     }
