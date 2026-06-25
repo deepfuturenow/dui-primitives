@@ -101,6 +101,7 @@ export class DuiPopoverPopupPrimitive extends LitElement {
     offset: 8,
     styles: portalPopupStyles,
     contentContainer: ".Content",
+    forwardProperties: ["--popover-popup-padding"],
     onPosition: ({ placement }) => {
       const actualSide = placement.split("-")[0] as FloatingPopupSide;
       if (actualSide !== this.#side) {
