@@ -102,6 +102,10 @@ export class DuiPopoverPopupPrimitive extends LitElement {
     styles: portalPopupStyles,
     contentContainer: ".Content",
     forwardProperties: ["--popover-popup-padding"],
+    onClose: () => {
+      // Sync portal-initiated close (outside click) back to the provider
+      this.#ctx.value?.closePopover();
+    },
     onPosition: ({ placement }) => {
       const actualSide = placement.split("-")[0] as FloatingPopupSide;
       if (actualSide !== this.#side) {

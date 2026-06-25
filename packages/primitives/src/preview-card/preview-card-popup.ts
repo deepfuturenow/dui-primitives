@@ -97,6 +97,9 @@ export class DuiPreviewCardPopupPrimitive extends LitElement {
     offset: 8,
     styles: portalPopupStyles,
     contentContainer: ".PreviewCardContent",
+    onClose: () => {
+      this.#ctx.value?.closePreviewCard();
+    },
     forwardProperties: ["--preview-card-popup-padding", "--preview-card-popup-max-width"],
     onPosition: ({ placement }) => {
       const actualSide = placement.split("-")[0] as FloatingPopupSide;

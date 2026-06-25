@@ -97,6 +97,9 @@ export class DuiTooltipPopupPrimitive extends LitElement {
     offset: 6,
     styles: portalPopupStyles,
     contentContainer: ".Content",
+    onClose: () => {
+      this.#ctx.value?.closeTooltip();
+    },
     onPosition: ({ placement }) => {
       const actualSide = placement.split("-")[0] as FloatingPopupSide;
       if (actualSide !== this.#side) {
