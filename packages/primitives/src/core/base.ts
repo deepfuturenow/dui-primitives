@@ -51,6 +51,14 @@ export const base = css`
     max-width: 100%;
   }
 
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+    font-size: inherit;
+  }
+
   a,
   a:visited,
   a:hover,
