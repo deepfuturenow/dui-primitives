@@ -18,3 +18,4 @@ import "./pages/docs-page-tree.ts";
 import "./pages/docs-page-splitter.ts";
 import "./pages/docs-page-popover.ts";
 import "./pages/docs-page-toast.ts";
+import "./pages/docs-page-data-table.ts";
