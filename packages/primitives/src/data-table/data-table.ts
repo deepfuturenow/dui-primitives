@@ -258,6 +258,10 @@ const componentStyles = css`
   .SortIcon {
     display: inline-flex;
     flex-shrink: 0;
+    /* Sane structural default so the raw primitive isn't unbounded;
+       override via ::part(sort-icon). */
+    width: 1em;
+    height: 1em;
   }
 
   /* Selection column: size to its checkbox, keep contents centered. */
@@ -322,8 +326,11 @@ const componentStyles = css`
  * @csspart table - The `<table>` element.
  * @csspart header-row - The header `<tr>`.
  * @csspart header-cell - Each header `<th>`.
+ * @csspart sort-icon - The sort indicator inside a sortable header.
  * @csspart row - Each body `<tr>`. Selected rows also carry the `selected` part.
  * @csspart cell - Each body `<td>`. Selection cells also carry the `selection` part.
+ * @csspart checkbox - The selection checkbox box (forwarded from `dui-checkbox`).
+ * @csspart checkbox-indicator - The selection checkbox check/dash indicator.
  * @csspart pagination - The pagination footer.
  *
  * @cssprop --data-table-selected-background - Background for selected rows
@@ -560,12 +567,12 @@ export class DuiDataTablePrimitive<
     if (!column.sortable) return nothing;
 
     if (this.#sort?.column === column.key) {
-      return html`<span class="SortIcon"
+      return html`<span class="SortIcon" part="sort-icon"
         >${this.#sort.direction === "asc" ? chevronUp : chevronDown}</span
       >`;
     }
 
-    return html`<span class="SortIcon">${chevronUpDown}</span>`;
+    return html`<span class="SortIcon" part="sort-icon">${chevronUpDown}</span>`;
   }
 
   #renderSelectionHeader(): TemplateResult {
@@ -582,6 +589,7 @@ export class DuiDataTablePrimitive<
     return html`
       <th part="header-cell selection">
         <dui-checkbox
+          exportparts="root:checkbox, indicator:checkbox-indicator"
           .checked=${checked}
           .indeterminate=${indeterminate}
           aria-label="Select all rows"
@@ -666,6 +674,7 @@ export class DuiDataTablePrimitive<
                 ? html`
                     <td part="cell selection">
                       <dui-checkbox
+                        exportparts="root:checkbox, indicator:checkbox-indicator"
                         .checked=${isSelected}
                         aria-label="Select row"
                         @checked-change=${(e: Event) =>
