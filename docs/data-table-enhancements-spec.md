@@ -184,6 +184,11 @@ const rowClickEvent = customEvent<{ row: T; key: string | undefined }>(
 - **Docs/JSDoc:** extend the class `@fires` list (`selection-change`, `row-click`), document the new
   props (`accessorFn`, `filterValue`, `globalFilterFn`, `selectionMode`, `selectedKeys`), the new
   `@csspart`s (`row`, `cell`, `selected`), and the `--data-table-selected-background` custom property.
+  - **Additional parts exposed while building the demo page** (needed to make the unstyled primitive
+    usable standalone): `header-row` / `header-cell`; `sort-icon` for the sort indicator (its
+    `.SortIcon` also gained a `1em` structural default so it isn't unbounded); and `checkbox` /
+    `checkbox-indicator`, forwarded from the nested `<dui-checkbox>` via `exportparts` so consumers
+    can style a control that lives two shadow levels deep.
 - **Tests (new infra):** add co-located `data-table.test.ts` using `deno test` + `jsr:@std/assert`.
   Cover the extracted pure functions:
   - accessor-based sorting (`accessorFn` vs `row[key]` fallback),
