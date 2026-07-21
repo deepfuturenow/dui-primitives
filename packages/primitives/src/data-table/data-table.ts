@@ -271,6 +271,14 @@ const componentStyles = css`
     text-align: center;
   }
 
+  /* The selection checkbox is an inline-level box; its baseline shifts
+     between the unchecked and checked states, which would make selected rows
+     render a pixel or two shorter. Center it so row height is independent of
+     selection state. */
+  [part~="selection"] dui-checkbox {
+    vertical-align: middle;
+  }
+
   /* Structural hook only — the styled layer supplies the real token.
      Inert (transparent) by default so the primitive stays unstyled. */
   tr[aria-selected="true"] {
