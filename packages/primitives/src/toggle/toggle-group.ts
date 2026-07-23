@@ -21,6 +21,7 @@ const styles = css`
 
   [part="root"] {
     display: inline-flex;
+    flex-wrap: wrap;
   }
 
   :host([orientation="vertical"]) [part="root"] {

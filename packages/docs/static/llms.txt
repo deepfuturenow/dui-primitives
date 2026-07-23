@@ -164,3 +164,19 @@ Import: import { DuiButtonPrimitive } from "@dui/primitives/button";
 - Import: `@dui/primitives/splitter`
 - Description: Draggable separator between two adjacent panels. Renders role=separator with full ARIA wiring.
 - Properties: disabled (boolean, false)
+
+### Toggle
+- Tag: `<dui-toggle>`
+- Import: `@dui/primitives/toggle`
+- Description: A two-state toggle button. Works standalone or inside a toggle group.
+- Properties: pressed (boolean | undefined), defaultPressed (boolean, false), disabled (boolean, false), value (string | undefined)
+- Events: pressed-change ({ pressed: boolean })
+- Slots: default (Toggle content (text and/or icons)), icon (Optional leading icon)
+
+### Toggle Group
+- Tag: `<dui-toggle-group>`
+- Import: `@dui/primitives/toggle`
+- Description: Groups toggle buttons with shared single or multiple selection.
+- Properties: value (string[] | undefined), defaultValue (string[], []), type ("single" | "multiple", "single"), orientation ("horizontal" | "vertical", "horizontal"), disabled (boolean, false), loop (boolean, true)
+- Events: value-change ({ value: string[] })
+- Slots: default (dui-toggle children)

@@ -381,6 +381,45 @@ export const primitiveRegistry: PrimitiveMeta[] = [
     slots: [],
     cssParts: [{ name: "root", description: "The separator element (role=separator). Paint a visible line via background or a centered ::part(root)::before" }],
   },
+  {
+    tagName: "dui-toggle",
+    name: "Toggle",
+    description: "A two-state toggle button. Works standalone or inside a toggle group.",
+    importPath: "@dui/primitives/toggle",
+    properties: [
+      { name: "pressed", type: "boolean | undefined", description: "Controlled pressed state" },
+      { name: "defaultPressed", type: "boolean", default: "false", description: "Initial pressed state (uncontrolled)" },
+      { name: "disabled", type: "boolean", default: "false", description: "Disable the toggle" },
+      { name: "value", type: "string | undefined", description: "Value used to identify this item within a toggle group" },
+    ],
+    events: [
+      { name: "pressed-change", detail: "{ pressed: boolean }", description: "Fired when toggled (standalone use)" },
+    ],
+    slots: [
+      { name: "default", description: "Toggle content (text and/or icons)" },
+      { name: "icon", description: "Optional leading icon" },
+    ],
+    cssParts: [{ name: "root", description: "The button element. Reflects data-pressed and data-disabled" }],
+  },
+  {
+    tagName: "dui-toggle-group",
+    name: "Toggle Group",
+    description: "Groups toggle buttons with shared single or multiple selection.",
+    importPath: "@dui/primitives/toggle",
+    properties: [
+      { name: "value", type: "string[] | undefined", description: "Controlled selected values" },
+      { name: "defaultValue", type: "string[]", default: "[]", description: "Initial selected values (uncontrolled)" },
+      { name: "type", type: '"single" | "multiple"', default: '"single"', description: "Selection mode" },
+      { name: "orientation", type: '"horizontal" | "vertical"', default: '"horizontal"', description: "Layout and arrow-key orientation" },
+      { name: "disabled", type: "boolean", default: "false", description: "Disable all items" },
+      { name: "loop", type: "boolean", default: "true", description: "Cycle arrow-key focus at the ends" },
+    ],
+    events: [
+      { name: "value-change", detail: "{ value: string[] }", description: "Fired when selection changes" },
+    ],
+    slots: [{ name: "default", description: "dui-toggle children" }],
+    cssParts: [{ name: "root", description: "The group container (role=group)" }],
+  },
 ];
 
 /**

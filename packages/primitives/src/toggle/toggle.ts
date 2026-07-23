@@ -110,6 +110,15 @@ export class DuiTogglePrimitive extends LitElement {
     this.dispatchEvent(pressedChangeEvent({ pressed: newPressed }));
   };
 
+  override updated(): void {
+    // Reflect the *computed* state (group-aware) onto the host so consumers can
+    // style selection/disabled via CSS — `::part(root)[data-pressed]` is invalid,
+    // and the group-inherited disabled state isn't captured by the reflected
+    // `disabled` property alone.
+    this.toggleAttribute("data-pressed", this.#isPressed);
+    this.toggleAttribute("data-disabled", this.#isDisabled);
+  }
+
   override render(): TemplateResult {
     const isPressed = this.#isPressed;
     const isDisabled = this.#isDisabled;
