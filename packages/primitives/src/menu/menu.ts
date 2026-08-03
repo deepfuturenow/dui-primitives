@@ -69,6 +69,14 @@ export class DuiMenuPrimitive extends LitElement {
     styles: portalPopupStyles,
     contentContainer: ".Menu",
     contentSelector: "dui-menu-item, dui-separator",
+    // Menu items are relocated into the portal, so the styled layer's
+    // size-driven vars must be forwarded onto the positioner for them to
+    // inherit. Mirrors the select/combobox popup-forwarding.
+    forwardProperties: [
+      "--menu-item-height",
+      "--menu-item-font-size",
+      "--menu-item-icon-size",
+    ],
     onOpen: () => {
       this.#highlightedIndex = -1;
       this.#getTriggerElement()?.setAttribute("data-open", "");
