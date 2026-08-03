@@ -158,6 +158,13 @@ export class DuiSelectPrimitive extends LitElement {
     matchWidth: false,
     minMatchWidth: true,
     styles: portalPopupStyles,
+    // Forward the styled layer's size-driven option-row vars onto the
+    // portal positioner so popup rows scale with the host's `size`.
+    forwardProperties: [
+      "--select-item-font-size",
+      "--select-item-padding-y",
+      "--select-item-icon-size",
+    ],
     alignToInner: (): HTMLElement | null => {
       if (!this.alignItemToTrigger) return null;
       const root = this.#popup.renderRoot as ShadowRoot | HTMLDivElement | null;

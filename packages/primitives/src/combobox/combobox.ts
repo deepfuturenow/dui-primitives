@@ -232,6 +232,13 @@ export class DuiComboboxPrimitive extends LitElement {
         ? this.shadowRoot?.querySelector<HTMLElement>(".Chips")
         : this.shadowRoot?.querySelector<HTMLElement>(".InputWrapper"),
     styles: portalPopupStyles,
+    // Forward the styled layer's size-driven option-row vars onto the
+    // portal positioner so popup rows scale with the host's `size`.
+    forwardProperties: [
+      "--combobox-item-font-size",
+      "--combobox-item-padding-y",
+      "--combobox-item-icon-size",
+    ],
     onOpen: () => {
       this.#highlightedIndex = -1;
       if (!this.multiple) {
