@@ -7,6 +7,7 @@ import { live } from "lit/directives/live.js";
 import { base } from "../core/base.ts";
 import { customEvent } from "../core/event.ts";
 import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
+import { ReopenGuard } from "../core/floating-popup-utils.ts";
 
 
 
@@ -242,7 +243,10 @@ export class DuiComboboxPrimitive extends LitElement {
     matchWidth: true,
     onOpen: () => {
       this.#highlightedIndex = -1;
-      if (!this.multiple) {
+      // Clear the query so a browse-open (click/keyboard) shows ALL options
+      // rather than filtering by the selected label. Skip when the open was
+      // triggered by typing — that must keep the just-entered character.
+      if (!this.multiple && !this.#openingViaInput) {
         this.#inputValue = "";
         const input =
           this.shadowRoot?.querySelector<HTMLInputElement>(".Input");
@@ -251,12 +255,16 @@ export class DuiComboboxPrimitive extends LitElement {
     },
     onClose: () => {
       this.#highlightedIndex = -1;
+      this.#reopenGuard.noteClose();
       if (!this.multiple) {
         const selected = this.options.find((o) => o.value === this.value);
         this.#inputValue = selected?.label ?? "";
       }
     },
   });
+
+  #reopenGuard = new ReopenGuard();
+  #openingViaInput = false;
 
   #inputId = `combobox-input-${crypto.randomUUID().slice(0, 8)}`;
   #listId = `combobox-list-${crypto.randomUUID().slice(0, 8)}`;
@@ -275,14 +283,30 @@ export class DuiComboboxPrimitive extends LitElement {
   #onInput = (event: InputEvent): void => {
     const target = event.target as HTMLInputElement;
     this.#inputValue = target.value;
-    if (!this.#popup.isOpen) {
-      if (!this.disabled) this.#popup.open();
+    if (!this.#popup.isOpen && !this.disabled) {
+      // Opening because the user typed — don't let onOpen clear the query.
+      this.#openingViaInput = true;
+      this.#popup.open();
+      this.#openingViaInput = false;
     }
     this.#highlightedIndex = -1;
   };
 
-  #onInputFocus = (): void => {
-    if (!this.#popup.isOpen && !this.disabled) {
+  /**
+   * Open on click (pointerup), NOT focus. `focus` fires during pointerdown, so
+   * opening there means the same click's `popover="auto"` light-dismiss (which
+   * pairs the outside pointerdown with its pointerup) tears the popup back down
+   * — a text input can't be a native popover invoker to opt out. Opening on the
+   * click event lands after pointerup, past the dismiss gesture. The guard stops
+   * a click that lands right after a light-dismiss from immediately reopening,
+   * so clicking the field while open closes it instead of re-flashing.
+   */
+  #onOpenClick = (): void => {
+    const input = this.shadowRoot?.querySelector<HTMLInputElement>(".Input");
+    input?.focus();
+    if (
+      !this.#popup.isOpen && !this.disabled && this.#reopenGuard.allowOpen()
+    ) {
       this.#popup.open();
     }
   };
@@ -424,11 +448,6 @@ export class DuiComboboxPrimitive extends LitElement {
     }
   };
 
-  #onChipsClick = (): void => {
-    const input = this.shadowRoot?.querySelector<HTMLInputElement>(".Input");
-    input?.focus();
-  };
-
   // ---- Render ----
 
   #renderChip = (value: string): TemplateResult => {
@@ -524,7 +543,6 @@ export class DuiComboboxPrimitive extends LitElement {
         .placeholder="${this.placeholder}"
         ?disabled="${this.disabled}"
         @input="${this.#onInput}"
-        @focus="${this.#onInputFocus}"
         @keydown="${this.#onInputKeyDown}"
       />
     `;
@@ -535,7 +553,7 @@ export class DuiComboboxPrimitive extends LitElement {
           class="Chips"
           part="chips"
           ?data-disabled="${this.disabled}"
-          @click="${this.#onChipsClick}"
+          @click="${this.#onOpenClick}"
         >
           ${repeat(Array.from(this.values), (v) => v, this.#renderChip)}
           ${inputHtml}
@@ -546,7 +564,11 @@ export class DuiComboboxPrimitive extends LitElement {
     }
 
     return html`
-      <div class="InputWrapper" part="input-wrapper">
+      <div
+        class="InputWrapper"
+        part="input-wrapper"
+        @click="${this.#onOpenClick}"
+      >
         ${inputHtml}
         <dui-icon class="Arrow"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></dui-icon>
       </div>
