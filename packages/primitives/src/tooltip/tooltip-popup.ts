@@ -29,6 +29,7 @@ const popupStyles = css`
     position: fixed;
     inset: auto;
     margin: 0;
+    border: none;
     overflow: visible;
     box-sizing: border-box;
     transform-origin: var(--transform-origin, center);

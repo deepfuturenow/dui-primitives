@@ -63,6 +63,7 @@ const componentStyles = css`
     position: fixed;
     inset: auto;
     margin: 0;
+    border: none;
     max-height: 240px;
     overflow-y: auto;
     overscroll-behavior: contain;

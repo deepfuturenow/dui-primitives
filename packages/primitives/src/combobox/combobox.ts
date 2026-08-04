@@ -117,6 +117,7 @@ const componentStyles = css`
     position: fixed;
     inset: auto;
     margin: 0;
+    border: none;
     overflow: visible;
     opacity: 0;
     transition-property: opacity, transform, overlay, display;
