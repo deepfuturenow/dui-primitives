@@ -53,9 +53,8 @@
     "./core/dom": "./src/core/dom.ts",
     "./core/event": "./src/core/event.ts",
     "./core/floating-popup-utils": "./src/core/floating-popup-utils.ts",
-    "./core/floating-portal-controller": "./src/core/floating-portal-controller.ts",
-    "./core/layout-types": "./src/core/layout-types.ts",
-    "./core/popup-coordinator": "./src/core/popup-coordinator.ts"
+    "./core/floating-top-layer-controller": "./src/core/floating-top-layer-controller.ts",
+    "./core/layout-types": "./src/core/layout-types.ts"
   },
   "imports": {
     "lit": "npm:lit@^3.3.2",
