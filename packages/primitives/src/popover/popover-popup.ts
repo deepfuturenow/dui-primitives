@@ -1,11 +1,18 @@
-/** Ported from original DUI: deep-future-app/app/client/components/dui/popover */
+/**
+ * Ported from original DUI: deep-future-app/app/client/components/dui/popover
+ *
+ * SPIKE (Phase 1): renders the popup IN PLACE (its own shadow root) as a native
+ * top-layer `[popover]` element instead of teleporting it to `document.body`.
+ * See `FloatingTopLayerController` for the rationale and the list of hacks this
+ * deletes. Floating UI is still responsible for positioning.
+ */
 
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { ContextConsumer } from "@lit/context";
 import { base } from "../core/base.ts";
 import { popoverContext } from "./popover-context.ts";
-import { FloatingPortalController } from "../core/floating-portal-controller.ts";
+import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
 import {
   type FloatingPopupSide,
   renderArrow,
@@ -15,57 +22,67 @@ const hostStyles = css`
   :host {
     display: contents;
   }
-
-  .slot-wrapper {
-    display: none;
-  }
 `;
 
-/** Structural styles injected into the portal positioner. */
-const portalPopupStyles = [
-  css`
-    .Popup {
-      box-sizing: border-box;
-      pointer-events: auto;
-      transform-origin: var(--transform-origin, center);
-      opacity: 1;
-      transform: scale(1);
-      transition-property: opacity, transform;
-    }
+/**
+ * Structural styles for the top-layer popup. Enter/exit animation is now
+ * declarative: `@starting-style` handles the entry, and `transition-behavior:
+ * allow-discrete` (+ animating `overlay`) keeps the element in the top layer
+ * through the exit transition — including platform light-dismiss, which the
+ * old JS `data-starting-style`/`data-ending-style` lifecycle could not.
+ */
+const popupStyles = css`
+  .Popup {
+    /* Reset the UA [popover] defaults so Floating UI's left/top win. */
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    box-sizing: border-box;
+    transform-origin: var(--transform-origin, center);
+    opacity: 0;
+    transform: scale(0.96);
+    transition-property: opacity, transform, overlay, display;
+    transition-behavior: allow-discrete;
+  }
 
-    .Popup[data-starting-style],
-    .Popup[data-ending-style] {
+  .Popup:popover-open {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  @starting-style {
+    .Popup:popover-open {
       opacity: 0;
       transform: scale(0.96);
     }
+  }
 
-    .Popup[data-side="top"] {
-      --transform-origin: bottom center;
-    }
+  .Popup[data-side="top"] {
+    --transform-origin: bottom center;
+  }
 
-    .Popup[data-side="bottom"] {
-      --transform-origin: top center;
-    }
+  .Popup[data-side="bottom"] {
+    --transform-origin: top center;
+  }
 
-    .Arrow {
-      position: absolute;
-      width: 10px;
-      height: 6px;
-    }
+  .Arrow {
+    position: absolute;
+    width: 10px;
+    height: 6px;
+  }
 
-    .Arrow[data-side="top"] {
-      bottom: -5px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
+  .Arrow[data-side="top"] {
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 
-    .Arrow[data-side="bottom"] {
-      top: -5px;
-      left: 50%;
-      transform: translateX(-50%) rotate(180deg);
-    }
-  `,
-];
+  .Arrow[data-side="bottom"] {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(180deg);
+  }
+`;
 
 /**
  * `<dui-popover-popup>` — The popover popup content container.
@@ -74,7 +91,7 @@ const portalPopupStyles = [
  */
 export class DuiPopoverPopupPrimitive extends LitElement {
   static tagName = "dui-popover-popup" as const;
-  static override styles = [base, hostStyles];
+  static override styles = [base, hostStyles, popupStyles];
 
   /** Whether to show an arrow pointing to the trigger. */
   @property({ type: Boolean, attribute: "show-arrow" })
@@ -94,16 +111,13 @@ export class DuiPopoverPopupPrimitive extends LitElement {
 
   #wasOpen = false;
 
-  #portal = new FloatingPortalController(this, {
+  #floating = new FloatingTopLayerController(this, {
     getAnchor: () => this.#ctx.value?.triggerEl,
-    matchWidth: false,
+    getPopover: () => this.shadowRoot?.querySelector<HTMLElement>(".Popup"),
     placement: "bottom",
     offset: 8,
-    styles: portalPopupStyles,
-    contentContainer: ".Content",
-    forwardProperties: ["--popover-popup-padding"],
-    onClose: () => {
-      // Sync portal-initiated close (outside click) back to the provider
+    onLightDismiss: () => {
+      // Outside-click / Esc dismissed the popover natively — sync it back.
       this.#ctx.value?.closePopover();
     },
     onPosition: ({ placement }) => {
@@ -112,30 +126,7 @@ export class DuiPopoverPopupPrimitive extends LitElement {
         this.#side = actualSide;
       }
     },
-    renderPopup: (portal) => {
-      const popupId = this.#ctx.value?.popupId ?? "";
-      return html`
-        <div
-          class="Popup"
-          id="${popupId}"
-          role="dialog"
-          ?data-starting-style="${portal.isStarting}"
-          ?data-ending-style="${portal.isEnding}"
-          data-side="${this.#side}"
-          @click="${this.#handleContentClick}"
-        >
-          <div class="Content"></div>
-          ${this.showArrow ? renderArrow(this.#side) : ""}
-        </div>
-      `;
-    },
   });
-
-  /** Check if an event path includes this popup's portal positioner. */
-  containsEventTarget(path: EventTarget[]): boolean {
-    const positioner = this.#portal.positionerElement;
-    return positioner !== null && path.includes(positioner);
-  }
 
   #handleContentClick = (): void => {
     if (this.closeOnClick) {
@@ -147,22 +138,31 @@ export class DuiPopoverPopupPrimitive extends LitElement {
     const isOpen = this.#ctx.value?.open ?? false;
 
     if (isOpen && !this.#wasOpen) {
-      this.#updatePlacement();
-      this.#portal.open();
+      this.#floating.placement = this.#ctx.value?.side ?? "bottom";
+      this.#floating.offset = this.#ctx.value?.sideOffset ?? 8;
+      this.#floating.open();
     } else if (!isOpen && this.#wasOpen) {
-      this.#portal.close();
+      this.#floating.close();
     }
 
     this.#wasOpen = isOpen;
   }
 
-  #updatePlacement(): void {
-    const side = this.#ctx.value?.side ?? "bottom";
-    this.#portal.placement = side;
-    this.#portal.offset = this.#ctx.value?.sideOffset ?? 8;
-  }
-
   override render(): TemplateResult {
-    return html`<div class="slot-wrapper"><slot></slot></div>`;
+    const popupId = this.#ctx.value?.popupId ?? "";
+    return html`
+      <div
+        class="Popup"
+        popover="auto"
+        id="${popupId}"
+        role="dialog"
+        data-side="${this.#side}"
+        @toggle="${this.#floating.handleToggle}"
+        @click="${this.#handleContentClick}"
+      >
+        <slot></slot>
+        ${this.showArrow ? renderArrow(this.#side) : ""}
+      </div>
+    `;
   }
 }
