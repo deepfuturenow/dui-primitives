@@ -3,7 +3,8 @@
 import { css, html, LitElement, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { base } from "../core/base.ts";
-import { FloatingPortalController } from "../core/floating-portal-controller.ts";
+import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
+import { ReopenGuard } from "../core/floating-popup-utils.ts";
 import { DuiMenuItemPrimitive } from "./menu-item.ts";
 
 const hostStyles = css`
@@ -17,27 +18,30 @@ const componentStyles = css`
     display: contents;
     cursor: pointer;
   }
-`;
 
-/** Structural styles injected into the portal positioner. */
-const portalPopupStyles = [
-  css`
-    .Popup {
-      max-height: 240px;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      opacity: 1;
-      transform: translateY(0);
-      transition-property: opacity, transform;
-      pointer-events: auto;
-    }
+  .Popup {
+    /* Reset UA [popover] defaults so Floating UI's left/top win. */
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 0;
+    transition-property: opacity, transform, overlay, display;
+    transition-behavior: allow-discrete;
+  }
 
-    .Popup[data-starting-style],
-    .Popup[data-ending-style] {
+  .Popup:popover-open {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .Popup:popover-open {
       opacity: 0;
     }
-  `,
-];
+  }
+`;
 
 /**
  * `<dui-menu>` — A popup menu triggered by a slotted element.
@@ -63,20 +67,13 @@ export class DuiMenuPrimitive extends LitElement {
     return slot?.assignedElements()?.[0] as HTMLElement | undefined;
   };
 
-  #popup = new FloatingPortalController(this, {
+  #reopenGuard = new ReopenGuard();
+
+  #popup = new FloatingTopLayerController(this, {
     getAnchor: (): HTMLElement => this.#getTriggerElement() ?? this,
+    getPopover: () => this.shadowRoot?.querySelector<HTMLElement>(".Popup"),
     matchWidth: false,
-    styles: portalPopupStyles,
-    contentContainer: ".Menu",
-    contentSelector: "dui-menu-item, dui-separator",
-    // Menu items are relocated into the portal, so the styled layer's
-    // size-driven vars must be forwarded onto the positioner for them to
-    // inherit. Mirrors the select/combobox popup-forwarding.
-    forwardProperties: [
-      "--menu-item-height",
-      "--menu-item-font-size",
-      "--menu-item-icon-size",
-    ],
+    placement: "bottom-start",
     onOpen: () => {
       this.#highlightedIndex = -1;
       this.#getTriggerElement()?.setAttribute("data-open", "");
@@ -84,30 +81,16 @@ export class DuiMenuPrimitive extends LitElement {
     onClose: () => {
       this.#highlightedIndex = -1;
       this.#getTriggerElement()?.removeAttribute("data-open");
+      this.#reopenGuard.noteClose();
     },
-    renderPopup: (portal) => html`
-      <div
-        class="Popup"
-        style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
-        ?data-starting-style="${portal.isStarting}"
-        ?data-ending-style="${portal.isEnding}"
-      >
-        <div
-          class="Menu"
-          id="${this.#menuId}"
-          role="menu"
-          @click="${this.#onItemSlotClick}"
-          @mousemove="${this.#onMenuMouseMove}"
-        ></div>
-      </div>
-    `,
   });
 
   #menuId = `menu-${crypto.randomUUID().slice(0, 8)}`;
 
+  // Items stay slotted in the light DOM (no portal teleport), so query the
+  // host directly. Size-driven custom properties inherit to them naturally.
   get #items(): DuiMenuItemPrimitive[] {
-    const container = this.#popup.renderRoot?.querySelector(".Menu") ?? this;
-    return [...container.querySelectorAll("dui-menu-item")] as DuiMenuItemPrimitive[];
+    return [...this.querySelectorAll("dui-menu-item")] as DuiMenuItemPrimitive[];
   }
 
   protected override updated(): void {
@@ -125,6 +108,7 @@ export class DuiMenuPrimitive extends LitElement {
     if (this.#popup.isOpen) {
       this.#popup.close();
     } else {
+      if (!this.#reopenGuard.allowOpen()) return;
       this.#popup.open();
     }
   }
@@ -242,6 +226,22 @@ export class DuiMenuPrimitive extends LitElement {
         @keydown="${this.#onKeyDown}"
       >
         <slot name="trigger"></slot>
+      </div>
+      <div
+        class="Popup"
+        popover="auto"
+        style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
+        @toggle="${this.#popup.handleToggle}"
+      >
+        <div
+          class="Menu"
+          id="${this.#menuId}"
+          role="menu"
+          @click="${this.#onItemSlotClick}"
+          @mousemove="${this.#onMenuMouseMove}"
+        >
+          <slot></slot>
+        </div>
       </div>
     `;
   }

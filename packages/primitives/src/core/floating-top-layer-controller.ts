@@ -43,12 +43,27 @@ export type FloatingTopLayerControllerOptions = {
   placement?: Placement;
   /** Offset in px between anchor and popup. Default: 4. */
   offset?: number;
+  /**
+   * Aligns the popup so the returned inner element (e.g. the selected option)
+   * lines up with the anchor — macOS-style select. Null falls back to normal
+   * offset/flip/shift positioning.
+   */
+  alignToInner?: () => HTMLElement | null;
+  /**
+   * Sub-element inside the anchor to align against (e.g. the trigger's text
+   * span). When set, inner alignment targets its vertical center.
+   */
+  alignToInnerReference?: () => HTMLElement | null;
   /** Called after each Floating UI reposition (e.g. to update data-side). */
   onPosition?: (result: { x: number; y: number; placement: Placement }) => void;
+  /** Called right after the popup is promoted to the top layer. */
+  onOpen?: () => void;
+  /** Called after every close — programmatic or platform — for cleanup. */
+  onClose?: () => void;
   /**
-   * Called when the popover closes because the PLATFORM dismissed it
-   * (outside click or Esc), so the host can sync that back into its own
-   * open state. Not called for programmatic `close()`.
+   * Called ONLY when the PLATFORM dismissed the popover (outside click / Esc),
+   * so the host can sync that back into any separate open state it keeps.
+   * Not called for programmatic `close()`.
    */
   onLightDismiss?: () => void;
 };
@@ -96,28 +111,41 @@ export class FloatingTopLayerController implements ReactiveController {
     popover.showPopover();
     this.#open = true;
     this.#startAutoUpdate();
+    this.#opts.onOpen?.();
+    this.#host.requestUpdate();
   }
 
-  /** Programmatic close (trigger/close-button). Exit animation runs via CSS. */
+  /**
+   * Programmatic close (trigger/close-button/item-select). Sets state
+   * synchronously — callers may read `isOpen` immediately after — while the
+   * exit animation runs via CSS. Distinct from platform light-dismiss, which
+   * arrives through `handleToggle` with `#open` still set.
+   */
   close(): void {
     const popover = this.#opts.getPopover();
     if (!popover || !popover.matches(":popover-open")) return;
 
-    popover.hidePopover();
     this.#open = false;
+    popover.hidePopover();
     this.#stopAutoUpdate();
+    this.#opts.onClose?.();
+    this.#host.requestUpdate();
   }
 
   /**
-   * Wire this to the `[popover]` element's `toggle` event. When the platform
-   * closes the popover (outside click / Esc), sync it back to host state.
+   * Wire this to the `[popover]` element's `toggle` event. Fires for every
+   * close, but only reaches here with `#open` still true when the PLATFORM
+   * dismissed it (programmatic `close()` already cleared `#open`), which is how
+   * we tell light-dismiss apart and additionally fire `onLightDismiss`.
    */
   handleToggle = (event: Event): void => {
     const toggle = event as ToggleEvent;
     if (toggle.newState === "closed" && this.#open) {
       this.#open = false;
       this.#stopAutoUpdate();
+      this.#opts.onClose?.();
       this.#opts.onLightDismiss?.();
+      this.#host.requestUpdate();
     }
   };
 
@@ -132,6 +160,12 @@ export class FloatingTopLayerController implements ReactiveController {
       offsetPx: this.#offset,
       matchWidth: this.#opts.matchWidth ?? false,
       minMatchWidth: this.#opts.minMatchWidth ?? false,
+      alignToInner: this.#opts.alignToInner
+        ? {
+          getElement: this.#opts.alignToInner,
+          getReferenceInner: this.#opts.alignToInnerReference,
+        }
+        : undefined,
       onPosition: this.#opts.onPosition,
     });
   }

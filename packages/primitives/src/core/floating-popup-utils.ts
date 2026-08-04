@@ -44,6 +44,30 @@ export const onTransitionEnd = (
   const timer = setTimeout(done, fallbackMs);
 };
 
+/**
+ * Guards the `popover="auto"` trigger-click reopen race: clicking a trigger
+ * while its popover is open makes the platform light-dismiss on pointerdown,
+ * and the trigger's own click would then reopen it in the same gesture. A
+ * component feeds `noteClose()` on every close and gates its open-on-click
+ * path behind `allowOpen()`, so an open landing within the window is swallowed.
+ */
+export class ReopenGuard {
+  #lastCloseAt = -Infinity;
+  #windowMs: number;
+
+  constructor(windowMs = 150) {
+    this.#windowMs = windowMs;
+  }
+
+  noteClose(): void {
+    this.#lastCloseAt = performance.now();
+  }
+
+  allowOpen(): boolean {
+    return performance.now() - this.#lastCloseAt >= this.#windowMs;
+  }
+}
+
 /** Render an arrow SVG pointing at the trigger. */
 export const renderArrow = (side: FloatingPopupSide): TemplateResult => html`
   <svg class="Arrow" part="arrow" viewBox="0 0 10 6" data-side="${side}">

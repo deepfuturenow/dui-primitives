@@ -5,6 +5,7 @@ import { property, state } from "lit/decorators.js";
 import { provide } from "@lit/context";
 import { base } from "../core/base.ts";
 import { customEvent } from "../core/event.ts";
+import { ReopenGuard } from "../core/floating-popup-utils.ts";
 import {
   type PopoverContext,
   popoverContext,
@@ -106,15 +107,14 @@ export class DuiPopoverPrimitive extends LitElement {
   }
 
   /**
-   * Timestamp of the last close. With `popover="auto"`, clicking the trigger
-   * while open causes the platform to light-dismiss the popover on pointerdown;
-   * the trigger's own click would then re-open it in the same gesture. Both
-   * signals funnel through this root, so we swallow an open that lands
-   * immediately after a close. (The fully race-free alternative is native
-   * `command`/`commandfor` invokers on the trigger, which conflicts with DUI's
-   * slotted-trigger model.)
+   * With `popover="auto"`, clicking the trigger while open causes the platform
+   * to light-dismiss on pointerdown; the trigger's own click would then reopen
+   * it in the same gesture. Both signals funnel through this root, so the guard
+   * swallows an open that lands immediately after a close. (The fully race-free
+   * alternative is native `command`/`commandfor` invokers on the trigger, which
+   * conflicts with DUI's slotted-trigger model.)
    */
-  #lastCloseAt = 0;
+  #reopenGuard = new ReopenGuard();
 
   #doOpen(): void {
     if (this.#internalOpen) return;
@@ -125,7 +125,7 @@ export class DuiPopoverPrimitive extends LitElement {
   #doClose(): void {
     if (!this.#internalOpen) return;
     this.#internalOpen = false;
-    this.#lastCloseAt = performance.now();
+    this.#reopenGuard.noteClose();
     this.dispatchEvent(openChangeEvent({ open: false }));
   }
 
@@ -133,7 +133,7 @@ export class DuiPopoverPrimitive extends LitElement {
     if (this.#isOpen) {
       this.#doClose();
     } else {
-      if (performance.now() - this.#lastCloseAt < 150) return;
+      if (!this.#reopenGuard.allowOpen()) return;
       this.#doOpen();
     }
   }
