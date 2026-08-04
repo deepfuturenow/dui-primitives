@@ -5,7 +5,7 @@ import { property, state } from "lit/decorators.js";
 import { ContextConsumer } from "@lit/context";
 import { base } from "../core/base.ts";
 import { previewCardContext } from "./preview-card-context.ts";
-import { FloatingPortalController } from "../core/floating-portal-controller.ts";
+import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
 import {
   type FloatingPopupSide,
   renderArrow,
@@ -15,57 +15,66 @@ const hostStyles = css`
   :host {
     display: contents;
   }
-
-  .slot-wrapper {
-    display: none;
-  }
 `;
 
-/** Structural styles injected into the portal positioner. */
-const portalPopupStyles = [
-  css`
-    .Popup {
-      box-sizing: border-box;
-      pointer-events: auto;
-      transform-origin: var(--transform-origin, center);
-      opacity: 1;
-      transform: scale(1);
-      transition-property: opacity, transform;
-    }
+/**
+ * Structural styles for the top-layer preview card. `popover="manual"`: like
+ * the tooltip it must stay out of the `auto` one-at-a-time group, and its own
+ * hover handlers (below) keep it open while the pointer is over the card.
+ */
+const popupStyles = css`
+  .Popup {
+    /* Reset UA [popover] defaults; overflow:visible lets the arrow escape. */
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    overflow: visible;
+    box-sizing: border-box;
+    transform-origin: var(--transform-origin, center);
+    opacity: 0;
+    transform: scale(0.96);
+    transition-property: opacity, transform, overlay, display;
+    transition-behavior: allow-discrete;
+  }
 
-    .Popup[data-starting-style],
-    .Popup[data-ending-style] {
+  .Popup:popover-open {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  @starting-style {
+    .Popup:popover-open {
       opacity: 0;
       transform: scale(0.96);
     }
+  }
 
-    .Popup[data-side="top"] {
-      --transform-origin: bottom center;
-    }
+  .Popup[data-side="top"] {
+    --transform-origin: bottom center;
+  }
 
-    .Popup[data-side="bottom"] {
-      --transform-origin: top center;
-    }
+  .Popup[data-side="bottom"] {
+    --transform-origin: top center;
+  }
 
-    .Arrow {
-      position: absolute;
-      width: 10px;
-      height: 6px;
-    }
+  .Arrow {
+    position: absolute;
+    width: 10px;
+    height: 6px;
+  }
 
-    .Arrow[data-side="top"] {
-      bottom: -5px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
+  .Arrow[data-side="top"] {
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 
-    .Arrow[data-side="bottom"] {
-      top: -5px;
-      left: 50%;
-      transform: translateX(-50%) rotate(180deg);
-    }
-  `,
-];
+  .Arrow[data-side="bottom"] {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(180deg);
+  }
+`;
 
 /**
  * `<dui-preview-card-popup>` — The preview card popup content container.
@@ -74,7 +83,7 @@ const portalPopupStyles = [
  */
 export class DuiPreviewCardPopupPrimitive extends LitElement {
   static tagName = "dui-preview-card-popup" as const;
-  static override styles = [base, hostStyles];
+  static override styles = [base, hostStyles, popupStyles];
 
   /** Whether to show an arrow pointing to the trigger. */
   @property({ type: Boolean, attribute: "show-arrow" })
@@ -90,40 +99,17 @@ export class DuiPreviewCardPopupPrimitive extends LitElement {
 
   #wasOpen = false;
 
-  #portal = new FloatingPortalController(this, {
+  #floating = new FloatingTopLayerController(this, {
     getAnchor: () => this.#ctx.value?.triggerEl,
+    getPopover: () => this.shadowRoot?.querySelector<HTMLElement>(".Popup"),
     matchWidth: false,
     placement: "top",
     offset: 8,
-    styles: portalPopupStyles,
-    contentContainer: ".PreviewCardContent",
-    onClose: () => {
-      this.#ctx.value?.closePreviewCard();
-    },
-    forwardProperties: ["--preview-card-popup-padding", "--preview-card-popup-max-width"],
     onPosition: ({ placement }) => {
       const actualSide = placement.split("-")[0] as FloatingPopupSide;
       if (actualSide !== this.#side) {
         this.#side = actualSide;
       }
-    },
-    renderPopup: (portal) => {
-      const popupId = this.#ctx.value?.popupId ?? "";
-      return html`
-        <div
-          class="Popup"
-          id="${popupId}"
-          role="tooltip"
-          ?data-starting-style="${portal.isStarting}"
-          ?data-ending-style="${portal.isEnding}"
-          data-side="${this.#side}"
-          @mouseenter="${this.#handleMouseEnter}"
-          @mouseleave="${this.#handleMouseLeave}"
-        >
-          <div class="PreviewCardContent"></div>
-          ${this.showArrow ? renderArrow(this.#side) : ""}
-        </div>
-      `;
     },
   });
 
@@ -139,22 +125,31 @@ export class DuiPreviewCardPopupPrimitive extends LitElement {
     const isOpen = this.#ctx.value?.open ?? false;
 
     if (isOpen && !this.#wasOpen) {
-      this.#updatePlacement();
-      this.#portal.open();
+      this.#floating.placement = this.#ctx.value?.side ?? "top";
+      this.#floating.offset = this.#ctx.value?.sideOffset ?? 8;
+      this.#floating.open();
     } else if (!isOpen && this.#wasOpen) {
-      this.#portal.close();
+      this.#floating.close();
     }
 
     this.#wasOpen = isOpen;
   }
 
-  #updatePlacement(): void {
-    const side = this.#ctx.value?.side ?? "top";
-    this.#portal.placement = side;
-    this.#portal.offset = this.#ctx.value?.sideOffset ?? 8;
-  }
-
   override render(): TemplateResult {
-    return html`<div class="slot-wrapper"><slot></slot></div>`;
+    const popupId = this.#ctx.value?.popupId ?? "";
+    return html`
+      <div
+        class="Popup"
+        popover="manual"
+        id="${popupId}"
+        role="tooltip"
+        data-side="${this.#side}"
+        @mouseenter="${this.#handleMouseEnter}"
+        @mouseleave="${this.#handleMouseLeave}"
+      >
+        <slot></slot>
+        ${this.showArrow ? renderArrow(this.#side) : ""}
+      </div>
+    `;
   }
 }
