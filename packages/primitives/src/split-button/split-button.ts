@@ -2,7 +2,8 @@ import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { base } from "../core/base.ts";
 import { customEvent } from "../core/event.ts";
-import { FloatingPortalController } from "../core/floating-portal-controller.ts";
+import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
+import { ReopenGuard } from "../core/floating-popup-utils.ts";
 import { DuiMenuItemPrimitive } from "../menu/menu-item.ts";
 
 /** Fired when the action (left) button is clicked. */
@@ -58,27 +59,30 @@ const componentStyles = css`
     justify-content: center;
     flex-shrink: 0;
   }
-`;
 
-/** Structural styles injected into the portal positioner. */
-const portalPopupStyles = [
-  css`
-    .Popup {
-      max-height: 240px;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      opacity: 1;
-      transform: translateY(0);
-      transition-property: opacity, transform;
-      pointer-events: auto;
-    }
+  .Popup {
+    /* Reset UA [popover] defaults so Floating UI's left/top win. */
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 0;
+    transition-property: opacity, transform, overlay, display;
+    transition-behavior: allow-discrete;
+  }
 
-    .Popup[data-starting-style],
-    .Popup[data-ending-style] {
+  .Popup:popover-open {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .Popup:popover-open {
       opacity: 0;
     }
-  `,
-];
+  }
+`;
 
 /**
  * `<dui-split-button>` — A button with an attached dropdown menu trigger.
@@ -125,40 +129,25 @@ export class DuiSplitButtonPrimitive extends LitElement {
 
   #menuId = `split-menu-${crypto.randomUUID().slice(0, 8)}`;
 
-  #popup = new FloatingPortalController(this, {
-    getAnchor: () =>
-      this.shadowRoot?.querySelector<HTMLElement>(".Root"),
+  #reopenGuard = new ReopenGuard();
+
+  #popup = new FloatingTopLayerController(this, {
+    getAnchor: () => this.shadowRoot?.querySelector<HTMLElement>(".Root"),
+    getPopover: () => this.shadowRoot?.querySelector<HTMLElement>(".Popup"),
     matchWidth: false,
-    styles: portalPopupStyles,
-    contentContainer: ".Menu",
-    contentSelector: "dui-menu-item",
+    placement: "bottom-start",
     onOpen: () => {
       this.#highlightedIndex = -1;
     },
     onClose: () => {
       this.#highlightedIndex = -1;
+      this.#reopenGuard.noteClose();
     },
-    renderPopup: (portal) => html`
-      <div
-        class="Popup"
-        style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
-        ?data-starting-style="${portal.isStarting}"
-        ?data-ending-style="${portal.isEnding}"
-      >
-        <div
-          class="Menu"
-          id="${this.#menuId}"
-          role="menu"
-          @click="${this.#onItemSlotClick}"
-          @mousemove="${this.#onMenuMouseMove}"
-        ></div>
-      </div>
-    `,
   });
 
+  // Items stay slotted in the light DOM (no portal teleport).
   get #items(): DuiMenuItemPrimitive[] {
-    const container = this.#popup.renderRoot?.querySelector(".Menu") ?? this;
-    return [...container.querySelectorAll("dui-menu-item")] as DuiMenuItemPrimitive[];
+    return [...this.querySelectorAll("dui-menu-item")] as DuiMenuItemPrimitive[];
   }
 
   protected override updated(): void {
@@ -196,6 +185,7 @@ export class DuiSplitButtonPrimitive extends LitElement {
     if (this.#popup.isOpen) {
       this.#popup.close();
     } else {
+      if (!this.#reopenGuard.allowOpen()) return;
       this.#popup.open();
     }
   };
@@ -344,6 +334,22 @@ export class DuiSplitButtonPrimitive extends LitElement {
             </dui-icon>
           </slot>
         </button>
+      </div>
+      <div
+        class="Popup"
+        popover="auto"
+        style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
+        @toggle="${this.#popup.handleToggle}"
+      >
+        <div
+          class="Menu"
+          id="${this.#menuId}"
+          role="menu"
+          @click="${this.#onItemSlotClick}"
+          @mousemove="${this.#onMenuMouseMove}"
+        >
+          <slot name="menu"></slot>
+        </div>
       </div>
     `;
   }
