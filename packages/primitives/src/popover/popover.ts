@@ -83,8 +83,8 @@ export class DuiPopoverPrimitive extends LitElement {
     if (this.defaultOpen) {
       this.#internalOpen = true;
     }
-    // SPIKE: no document keydown listener — `popover="auto"` closes on Esc
-    // natively and syncs back via the popup's `toggle` event.
+    // No document keydown listener — `popover="auto"` closes on Esc natively
+    // and syncs back via the popup's `toggle` event.
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -106,12 +106,13 @@ export class DuiPopoverPrimitive extends LitElement {
   }
 
   /**
-   * SPIKE: timestamp of the last close. With `popover="auto"`, clicking the
-   * trigger while open causes the platform to light-dismiss the popover on
-   * pointerdown; the trigger's own click would then re-open it in the same
-   * gesture. Both signals funnel through this root, so we swallow an open that
-   * lands immediately after a close. (The fully race-free fix is native
-   * `command`/`commandfor` invokers on the trigger — see the spike writeup.)
+   * Timestamp of the last close. With `popover="auto"`, clicking the trigger
+   * while open causes the platform to light-dismiss the popover on pointerdown;
+   * the trigger's own click would then re-open it in the same gesture. Both
+   * signals funnel through this root, so we swallow an open that lands
+   * immediately after a close. (The fully race-free alternative is native
+   * `command`/`commandfor` invokers on the trigger, which conflicts with DUI's
+   * slotted-trigger model.)
    */
   #lastCloseAt = 0;
 

@@ -1,9 +1,9 @@
 /**
  * Ported from original DUI: deep-future-app/app/client/components/dui/popover
  *
- * SPIKE (Phase 1): renders the popup IN PLACE (its own shadow root) as a native
- * top-layer `[popover]` element instead of teleporting it to `document.body`.
- * See `FloatingTopLayerController` for the rationale and the list of hacks this
+ * Renders the popup IN PLACE (its own shadow root) as a native top-layer
+ * `[popover]` element instead of teleporting it to `document.body`. See
+ * `FloatingTopLayerController` for the rationale and the list of hacks this
  * deletes. Floating UI is still responsible for positioning.
  */
 

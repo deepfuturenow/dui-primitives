@@ -1,11 +1,11 @@
 /**
- * SPIKE (Phase 1): native-Popover-API replacement for FloatingPortalController.
- *
- * The old controller teleports the popup node out to `document.body` to escape
- * `container-type` / `overflow` / stacking-context ancestors, then pays a long
- * tail of hacks to undo the consequences of that teleport (node moving, CSS var
- * forwarding, shadow re-adoption, a hardcoded z-index, a global one-open-at-a-
- * time coordinator, and a manual document-click light-dismiss listener).
+ * Native-Popover-API floating controller. Supersedes FloatingPortalController,
+ * which teleports the popup node out to `document.body` to escape
+ * `container-type` / `overflow` / stacking-context ancestors and then pays a
+ * long tail of hacks to undo the consequences of that teleport (node moving,
+ * CSS var forwarding, shadow re-adoption, a hardcoded z-index, a global
+ * one-open-at-a-time coordinator, and a manual document-click light-dismiss
+ * listener).
  *
  * This controller keeps ONLY the part that has no native equivalent —
  * Floating UI positioning — and hands everything else to the platform:
