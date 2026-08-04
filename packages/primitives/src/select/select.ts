@@ -5,7 +5,8 @@ import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { base } from "../core/base.ts";
 import { customEvent } from "../core/event.ts";
-import { FloatingPortalController } from "../core/floating-portal-controller.ts";
+import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
+import { ReopenGuard } from "../core/floating-popup-utils.ts";
 
 
 export type SelectOption = {
@@ -56,51 +57,54 @@ const componentStyles = css`
   .Icon {
     flex-shrink: 0;
   }
-`;
 
-/** Structural styles injected into the portal positioner. */
-const portalPopupStyles = [
-  css`
-    .Popup {
-      max-height: 240px;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      opacity: 1;
-      transform: translateY(0);
-      transition-property: opacity, transform;
-      pointer-events: auto;
-    }
+  .Popup {
+    /* Reset UA [popover] defaults so Floating UI's left/top win. */
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    opacity: 0;
+    transition-property: opacity, transform, overlay, display;
+    transition-behavior: allow-discrete;
+  }
 
-    .Popup[data-starting-style],
-    .Popup[data-ending-style] {
+  .Popup:popover-open {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .Popup:popover-open {
       opacity: 0;
     }
+  }
 
-    .Item {
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-    }
+  .Item {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
 
-    .Item[data-disabled] {
-      cursor: not-allowed;
-    }
+  .Item[data-disabled] {
+    cursor: not-allowed;
+  }
 
-    .ItemIndicator {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+  .ItemIndicator {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-    .ItemText {
-      flex: 1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-  `,
-];
+  .ItemText {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+`;
 
 /**
  * `<dui-select>` — A dropdown select for choosing from a list of options.
@@ -152,24 +156,22 @@ export class DuiSelectPrimitive extends LitElement {
   #triggerId = `select-trigger-${crypto.randomUUID().slice(0, 8)}`;
   #listboxId = `select-listbox-${crypto.randomUUID().slice(0, 8)}`;
 
-  #popup = new FloatingPortalController(this, {
-    getAnchor: () =>
-      this.shadowRoot?.querySelector<HTMLElement>(".Trigger"),
+  #reopenGuard = new ReopenGuard();
+
+  #popup = new FloatingTopLayerController(this, {
+    getAnchor: () => this.shadowRoot?.querySelector<HTMLElement>(".Trigger"),
+    getPopover: () => this.shadowRoot?.querySelector<HTMLElement>(".Popup"),
     matchWidth: false,
     minMatchWidth: true,
-    styles: portalPopupStyles,
-    // Forward the styled layer's size-driven option-row vars onto the
-    // portal positioner so popup rows scale with the host's `size`.
-    forwardProperties: [
-      "--select-item-font-size",
-      "--select-item-padding-y",
-      "--select-item-icon-size",
-    ],
+    // Options render in this component's own shadow root now (no teleport),
+    // so the selected item and size-driven vars are queried/inherited here.
     alignToInner: (): HTMLElement | null => {
       if (!this.alignItemToTrigger) return null;
-      const root = this.#popup.renderRoot as ShadowRoot | HTMLDivElement | null;
-      const selectedItem = root?.querySelector<HTMLElement>("[data-selected]");
-      return selectedItem?.querySelector<HTMLElement>(".ItemText") ?? selectedItem ?? null;
+      const selectedItem = this.shadowRoot?.querySelector<HTMLElement>(
+        "[data-selected]",
+      );
+      return selectedItem?.querySelector<HTMLElement>(".ItemText") ??
+        selectedItem ?? null;
     },
     alignToInnerReference: (): HTMLElement | null => {
       if (!this.alignItemToTrigger) return null;
@@ -180,30 +182,7 @@ export class DuiSelectPrimitive extends LitElement {
     },
     onClose: () => {
       this.#highlightedIndex = -1;
-    },
-    renderPopup: (portal) => {
-      return html`
-        <div
-          class="Popup"
-          ?data-align-inner="${this.alignItemToTrigger && this.value !== ""}"
-          ?data-starting-style="${portal.isStarting}"
-          ?data-ending-style="${portal.isEnding}"
-        >
-          <div
-            class="Listbox"
-            id="${this.#listboxId}"
-            role="listbox"
-
-            @mousedown="${this.#onListMouseDown}"
-          >
-            ${repeat(
-              this.options,
-              (option) => option.value,
-              this.#renderItem,
-            )}
-          </div>
-        </div>
-      `;
+      this.#reopenGuard.noteClose();
     },
   });
 
@@ -234,6 +213,7 @@ export class DuiSelectPrimitive extends LitElement {
     if (this.#popup.isOpen) {
       this.#popup.close();
     } else {
+      if (!this.#reopenGuard.allowOpen()) return;
       this.#popup.open();
     }
   };
@@ -420,6 +400,21 @@ export class DuiSelectPrimitive extends LitElement {
         </span>
       </div>
 
+      <div
+        class="Popup"
+        popover="auto"
+        ?data-align-inner="${this.alignItemToTrigger && this.value !== ""}"
+        @toggle="${this.#popup.handleToggle}"
+      >
+        <div
+          class="Listbox"
+          id="${this.#listboxId}"
+          role="listbox"
+          @mousedown="${this.#onListMouseDown}"
+        >
+          ${repeat(this.options, (option) => option.value, this.#renderItem)}
+        </div>
+      </div>
     `;
   }
 }

@@ -149,9 +149,13 @@ export const alignInner = (options: AlignInnerOptions): Middleware => ({
     const maxY = viewportH - floatingH - padding;
     const clampedY = Math.max(minY, Math.min(y, maxY));
 
-    // If we clamped, scroll the popup so the selected item stays visible
-    const scrollContainer = floatingEl.shadowRoot
-      ?.querySelector<HTMLElement>(".Popup") ?? floatingEl.querySelector<HTMLElement>(".Popup");
+    // If we clamped, scroll the popup so the selected item stays visible.
+    // Top-layer components pass the `.Popup` as the floating element itself;
+    // the legacy portal positioner wrapped it in a shadow root.
+    const scrollContainer = floatingEl.classList.contains("Popup")
+      ? floatingEl
+      : floatingEl.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
+        floatingEl.querySelector<HTMLElement>(".Popup");
     if (scrollContainer && clampedY !== y) {
       const scrollDelta = y - clampedY; // negative = we pushed down, positive = pushed up
       scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - scrollDelta);
