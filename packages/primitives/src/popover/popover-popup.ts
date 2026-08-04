@@ -33,10 +33,13 @@ const hostStyles = css`
  */
 const popupStyles = css`
   .Popup {
-    /* Reset the UA [popover] defaults so Floating UI's left/top win. */
+    /* Reset the UA [popover] defaults so Floating UI's left/top win. The
+      UA sheet also sets overflow:auto, which clips the arrow (positioned
+      outside the box) and spawns a phantom scrollbar — restore visible. */
     position: fixed;
     inset: auto;
     margin: 0;
+    overflow: visible;
     box-sizing: border-box;
     transform-origin: var(--transform-origin, center);
     opacity: 0;
