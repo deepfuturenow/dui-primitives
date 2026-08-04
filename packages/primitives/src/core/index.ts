@@ -7,11 +7,11 @@ export {
 } from "./dom.ts";
 export type { GetRootDocumentOptions } from "./dom.ts";
 export { customEvent } from "./event.ts";
-export { notifyPopupOpening, notifyPopupClosing } from "./popup-coordinator.ts";
 export {
   waitForAnimationFrame,
   onTransitionEnd,
   renderArrow,
+  ReopenGuard,
   computeFixedPosition,
   startFixedAutoUpdate,
 } from "./floating-popup-utils.ts";
@@ -20,6 +20,6 @@ export type {
   FloatingPopupSide,
   ComputeFixedPositionOptions,
 } from "./floating-popup-utils.ts";
-export { FloatingPortalController } from "./floating-portal-controller.ts";
-export type { FloatingPortalControllerOptions } from "./floating-portal-controller.ts";
+export { FloatingTopLayerController } from "./floating-top-layer-controller.ts";
+export type { FloatingTopLayerControllerOptions } from "./floating-top-layer-controller.ts";
 export type { StackGap } from "./layout-types.ts";
