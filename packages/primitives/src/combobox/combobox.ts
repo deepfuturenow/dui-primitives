@@ -6,7 +6,7 @@ import { repeat } from "lit/directives/repeat.js";
 import { live } from "lit/directives/live.js";
 import { base } from "../core/base.ts";
 import { customEvent } from "../core/event.ts";
-import { FloatingPortalController } from "../core/floating-portal-controller.ts";
+import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
 
 
 
@@ -109,49 +109,55 @@ const componentStyles = css`
     cursor: pointer;
     flex-shrink: 0;
   }
-`;
 
-/** Structural styles injected into the portal positioner. */
-const portalPopupStyles = [
-  css`
-    .Popup {
-      opacity: 1;
-      transform: translateY(0);
-      transition-property: opacity, transform;
-      pointer-events: auto;
-    }
+  /* ---- Popup (native top-layer [popover]) ---- */
 
-    .Popup[data-starting-style],
-    .Popup[data-ending-style] {
+  .Popup {
+    /* Reset UA [popover] defaults; the inner dui-scroll-area owns scrolling. */
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    overflow: visible;
+    opacity: 0;
+    transition-property: opacity, transform, overlay, display;
+    transition-behavior: allow-discrete;
+  }
+
+  .Popup:popover-open {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .Popup:popover-open {
       opacity: 0;
     }
+  }
 
-    dui-scroll-area {
-      max-height: 240px;
-      height: auto;
-    }
+  dui-scroll-area {
+    max-height: 240px;
+    height: auto;
+  }
 
-    .Item {
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-    }
+  .Item {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
 
-    .ItemIndicator {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+  .ItemIndicator {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-    .ItemText {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  `,
-];
+  .ItemText {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`;
 
 /**
  * `<dui-combobox>` — A searchable dropdown for selecting from a list of options.
@@ -226,19 +232,13 @@ export class DuiComboboxPrimitive extends LitElement {
   @state()
   accessor #inputValue = "";
 
-  #popup = new FloatingPortalController(this, {
+  #popup = new FloatingTopLayerController(this, {
     getAnchor: () =>
       this.multiple
         ? this.shadowRoot?.querySelector<HTMLElement>(".Chips")
         : this.shadowRoot?.querySelector<HTMLElement>(".InputWrapper"),
-    styles: portalPopupStyles,
-    // Forward the styled layer's size-driven option-row vars onto the
-    // portal positioner so popup rows scale with the host's `size`.
-    forwardProperties: [
-      "--combobox-item-font-size",
-      "--combobox-item-padding-y",
-      "--combobox-item-icon-size",
-    ],
+    getPopover: () => this.shadowRoot?.querySelector<HTMLElement>(".Popup"),
+    matchWidth: true,
     onOpen: () => {
       this.#highlightedIndex = -1;
       if (!this.multiple) {
@@ -254,33 +254,6 @@ export class DuiComboboxPrimitive extends LitElement {
         const selected = this.options.find((o) => o.value === this.value);
         this.#inputValue = selected?.label ?? "";
       }
-    },
-    renderPopup: (portal) => {
-      const filtered = this.#filteredOptions;
-      const isEmpty = filtered.length === 0;
-
-      return html`
-        <div
-          class="Popup"
-          ?data-starting-style="${portal.isStarting}"
-          ?data-ending-style="${portal.isEnding}"
-        >
-          <dui-scroll-area>
-            <div
-              class="List"
-              id="${this.#listId}"
-              role="listbox"
-              aria-labelledby="${this.#inputId}"
-              ?data-empty="${isEmpty}"
-              @mousedown="${this.#onListMouseDown}"
-              @mousemove="${this.#onListMouseMove}"
-            >
-              ${repeat(filtered, (option) => option.value, this.#renderItem)}
-              ${isEmpty ? html` <div class="Empty">No results</div> ` : nothing}
-            </div>
-          </dui-scroll-area>
-        </div>
-      `;
     },
   });
 
@@ -504,6 +477,34 @@ export class DuiComboboxPrimitive extends LitElement {
     `;
   };
 
+  #renderPopup(): TemplateResult {
+    const filtered = this.#filteredOptions;
+    const isEmpty = filtered.length === 0;
+
+    return html`
+      <div
+        class="Popup"
+        popover="auto"
+        @toggle="${this.#popup.handleToggle}"
+      >
+        <dui-scroll-area>
+          <div
+            class="List"
+            id="${this.#listId}"
+            role="listbox"
+            aria-labelledby="${this.#inputId}"
+            ?data-empty="${isEmpty}"
+            @mousedown="${this.#onListMouseDown}"
+            @mousemove="${this.#onListMouseMove}"
+          >
+            ${repeat(filtered, (option) => option.value, this.#renderItem)}
+            ${isEmpty ? html` <div class="Empty">No results</div> ` : nothing}
+          </div>
+        </dui-scroll-area>
+      </div>
+    `;
+  }
+
   override render(): TemplateResult {
     const inputHtml = html`
       <input
@@ -539,6 +540,7 @@ export class DuiComboboxPrimitive extends LitElement {
           ${inputHtml}
           <dui-icon class="Arrow"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></dui-icon>
         </div>
+        ${this.#renderPopup()}
       `;
     }
 
@@ -547,6 +549,7 @@ export class DuiComboboxPrimitive extends LitElement {
         ${inputHtml}
         <dui-icon class="Arrow"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></dui-icon>
       </div>
+      ${this.#renderPopup()}
     `;
   }
 }
