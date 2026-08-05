@@ -201,7 +201,21 @@ export const computeFixedPosition = (
     padding = 8,
   } = options;
 
-  const useInnerAlign = options.alignToInner?.getElement() != null;
+  // Inner-alignment (macOS "selected item overlays the trigger") is only stable
+  // when the whole list fits without scrolling. Once the list overflows and
+  // becomes scrollable, the alignment math is unstable and pins the popup to a
+  // viewport edge, detached from the trigger — so fall back to normal
+  // offset/flip/shift positioning, which keeps the popup anchored to the
+  // trigger and lets the list scroll internally.
+  const innerEl = options.alignToInner?.getElement() ?? null;
+  const scrollContainer = floating.classList.contains("Popup")
+    ? floating
+    : floating.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
+      floating.querySelector<HTMLElement>(".Popup") ??
+      floating;
+  const listFits =
+    scrollContainer.scrollHeight <= scrollContainer.clientHeight + 1;
+  const useInnerAlign = innerEl != null && listFits;
 
   const middleware: Middleware[] = useInnerAlign
     ? [alignInner(options.alignToInner!)]

@@ -184,6 +184,8 @@ export class DuiSelectPrimitive extends LitElement {
     },
     onOpen: () => {
       this.#highlightedIndex = this.#selectedIndex;
+      // After the listbox renders, make sure the current selection is visible.
+      this.updateComplete.then(() => this.#scrollSelectedIntoView());
     },
     onClose: () => {
       this.#highlightedIndex = -1;
@@ -342,6 +344,21 @@ export class DuiSelectPrimitive extends LitElement {
     const trigger =
       this.shadowRoot?.querySelector<HTMLElement>(".Trigger");
     trigger?.focus();
+  }
+
+  /**
+   * Center the selected option in the popup when it opens. A no-op for lists
+   * that fit (nothing to scroll); for long, scrollable lists — where the popup
+   * falls back to normal below/above positioning instead of overlaying the
+   * selected item on the trigger — this reveals the current selection.
+   */
+  #scrollSelectedIntoView(): void {
+    const popup = this.shadowRoot?.querySelector<HTMLElement>(".Popup");
+    const item = this.shadowRoot?.querySelector<HTMLElement>("[data-selected]");
+    if (!popup || !item) return;
+    if (popup.scrollHeight <= popup.clientHeight) return;
+    popup.scrollTop = item.offsetTop -
+      (popup.clientHeight - item.offsetHeight) / 2;
   }
 
   // ---- Render ----
