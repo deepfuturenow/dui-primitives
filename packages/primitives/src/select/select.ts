@@ -29,6 +29,10 @@ export const valueChangeEvent = customEvent<SelectValueChangeDetail>(
 const hostStyles = css`
   :host {
     display: block;
+    /* Allow the select to shrink below its content's intrinsic width when it
+       is a flex/grid item, so the .Value's ellipsis truncation actually
+       engages instead of the trigger pushing the surrounding layout wider. */
+    min-width: 0;
   }
 `;
 
