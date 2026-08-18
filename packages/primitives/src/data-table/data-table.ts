@@ -5,6 +5,7 @@ import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { styleMap, type StyleInfo } from "lit/directives/style-map.js";
 import { base } from "../core/base.ts";
+import { isApplePlatform } from "../core/dom.ts";
 import { customEvent } from "../core/event.ts";
 
 
@@ -55,6 +56,9 @@ export type RowClickDetail<T> = {
   row: T;
   key: string | undefined;
 };
+
+/** Internal: the two modifier gestures over a body row. */
+type ModifierGesture = "toggle" | "range";
 
 // ── Events ─────────────────────────────────────────────────────────────
 
@@ -211,6 +215,36 @@ export function deriveSelectAllState(
   };
 }
 
+/**
+ * Keys between `anchorKey` and `targetKey` inclusive, in display order.
+ * Order-agnostic: the target may sit above or below the anchor. Returns `[]`
+ * if either key is absent from `orderedKeys`.
+ */
+export function resolveRange(
+  orderedKeys: string[],
+  anchorKey: string,
+  targetKey: string,
+): string[] {
+  const anchorIndex = orderedKeys.indexOf(anchorKey);
+  const targetIndex = orderedKeys.indexOf(targetKey);
+  if (anchorIndex === -1 || targetIndex === -1) return [];
+
+  const start = Math.min(anchorIndex, targetIndex);
+  const end = Math.max(anchorIndex, targetIndex);
+  return orderedKeys.slice(start, end + 1);
+}
+
+/** Set equality over key collections, order-insensitive. */
+function sameKeys(a: Iterable<string>, b: Iterable<string>): boolean {
+  const left = a instanceof Set ? a : new Set(a);
+  const right = b instanceof Set ? b : new Set(b);
+  if (left.size !== right.size) return false;
+  for (const key of left) {
+    if (!right.has(key)) return false;
+  }
+  return true;
+}
+
 // ── Styles ─────────────────────────────────────────────────────────────
 
 const hostStyles = css`
@@ -279,6 +313,14 @@ const componentStyles = css`
     vertical-align: middle;
   }
 
+  /* While a selection modifier is down, a click on a row selects it instead of
+     placing a text caret, so the I-beam would be advertising a gesture that is
+     no longer available. Cells only: links keep their pointer cursor, because
+     cmd-click still opens them. */
+  .TableWindow[data-modifier] tbody td {
+    cursor: default;
+  }
+
   /* Structural hook only — the styled layer supplies the real token.
      Inert (transparent) by default so the primitive stays unstyled. */
   tr[aria-selected="true"] {
@@ -329,6 +371,35 @@ const componentStyles = css`
  * Selection is controlled and keyed by `rowKey`: the component reflects
  * `selectedKeys` and emits the proposed next selection on change.
  *
+ * ### Range selection (`selection-mode="multiple"`)
+ *
+ * A Finder-style desktop accelerator layered on top of the checkbox column.
+ * An unmodified click never touches selection, so none of these collide with
+ * selecting text, clicking a link, or a button in a cell:
+ *
+ * - **Cmd-click** (⌘ on Apple platforms, Ctrl elsewhere) anywhere on a row
+ *   toggles it and moves the anchor. It yields to `a[href]` only — cmd-click a
+ *   link and it opens in a new tab; cmd-click a button and the row is selected
+ *   without the button firing.
+ * - **Shift-click** selects `base ∪ range(anchor, target)`, where `base` is the
+ *   selection as it stood when the anchor was set. Shift-clicking back inside
+ *   the range contracts it. With no anchor it behaves as a cmd-click.
+ * - **Escape** clears the selection.
+ *
+ * While either modifier is held, body cells drop the text I-beam for the
+ * default cursor, since a click there now selects rather than placing a caret.
+ * Links keep their pointer cursor — cmd-click still opens them.
+ *
+ * The anchor is dropped whenever the rows on screen change — sort, filter,
+ * data, page, page size — and on header select-all, so ranges never span
+ * pages. It is also dropped when an incoming `selectedKeys` differs from the
+ * set this component last proposed: a consumer that rewrites the proposal
+ * (say, clamping it to ten rows) resets the anchor on every gesture, which
+ * effectively disables range selection.
+ *
+ * Modifiers are ignored in `<thead>` and in the other selection modes, and
+ * touch has no modifiers, so the checkbox column remains the universal path.
+ *
  * @csspart root - The outer container.
  * @csspart table-window - The scroll container around the table.
  * @csspart table - The `<table>` element.
@@ -347,7 +418,9 @@ const componentStyles = css`
  * @fires sort-change - Fired when a sortable column header is clicked. Detail: SortState
  * @fires page-change - Fired when the page changes. Detail: PageState
  * @fires selection-change - Fired with the proposed next selection. Detail: { selectedKeys, selectedRows }
- * @fires row-click - Fired when a body row is clicked (not on interactive cell content). Detail: { row, key }
+ * @fires row-click - Fired when a body row is clicked (not on interactive cell
+ *   content). Suppressed when a modifier gesture claims the click, i.e. a
+ *   cmd/shift-click in `selection-mode="multiple"`. Detail: { row, key }
  */
 export class DuiDataTablePrimitive<
   T extends Record<string, unknown> = Record<string, unknown>,
@@ -407,7 +480,57 @@ export class DuiDataTablePrimitive<
   /** Rows after filtering (before sort/paginate). Drives totals + select-all. */
   #filtered: T[] = [];
 
+  /**
+   * The row a shift-click range extends from.
+   *
+   * Invariant: the anchor is a key present in `#displayRows`, or it is `null`.
+   * That is what lets a range be computed over the current page alone.
+   */
+  #anchorKey: string | null = null;
+
+  /**
+   * Snapshot of the selection taken when the anchor was set. Ranges are
+   * `base ∪ range(anchor, target)`, so repeated shift-clicks recompute the
+   * range (and can shrink it) instead of accumulating, while selections made
+   * before the anchor survive.
+   */
+  #baseKeys: ReadonlySet<string> | null = null;
+
+  /**
+   * The last selection we proposed. Selection is controlled, so an incoming
+   * `selectedKeys` that differs from this means the consumer rewrote our
+   * proposal and `#baseKeys` no longer describes anything real.
+   */
+  #lastProposal: ReadonlySet<string> | null = null;
+
+  /** The scroll container; owns the modifier gestures and the Escape key. */
+  #tableWindow: HTMLElement | null = null;
+
+  /** Whether a selection modifier is currently down. Drives the cursor only. */
+  #modifierHeld = false;
+
   // ── Lifecycle ──────────────────────────────────────────────────────
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+
+    // Document-level, because the modifier can go down while the pointer is
+    // over the table but focus is somewhere else entirely. Capture phase so a
+    // wrapper that swallows key events can't leave the cursor stale.
+    const doc = this.ownerDocument;
+    doc.addEventListener("keydown", this.#onModifierKey, true);
+    doc.addEventListener("keyup", this.#onModifierKey, true);
+    // Cmd-tabbing away never delivers the keyup.
+    doc.defaultView?.addEventListener("blur", this.#onWindowBlur);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    const doc = this.ownerDocument;
+    doc.removeEventListener("keydown", this.#onModifierKey, true);
+    doc.removeEventListener("keyup", this.#onModifierKey, true);
+    doc.defaultView?.removeEventListener("blur", this.#onWindowBlur);
+  }
 
   override willUpdate(changed: PropertyValues): void {
     const dataOrFilterChanged =
@@ -443,7 +566,41 @@ export class DuiDataTablePrimitive<
       } else {
         this.#displayRows = sorted;
       }
+
+      // Anything that reshuffles which rows are on screen can silently carry
+      // the anchor out of `#displayRows`, breaking the invariant above.
+      this.#dropAnchor();
     }
+
+    // Controlled divergence: a `selectedKeys` that isn't the set we last
+    // proposed means our base snapshot describes a selection that never
+    // happened, and ranges built on it would be fiction.
+    if (
+      changed.has("selectedKeys") &&
+      (this.#lastProposal === null ||
+        !sameKeys(this.#lastProposal, this.selectedKeys))
+    ) {
+      this.#dropAnchor();
+    }
+  }
+
+  override firstUpdated(): void {
+    this.#tableWindow = this.renderRoot.querySelector<HTMLElement>(
+      ".TableWindow",
+    );
+
+    // Capture phase, deliberately: a `<dui-button>` or `<dui-checkbox>` in a
+    // row handles its own click at the target, so a bubble-phase listener here
+    // would run too late to take the gesture away from it.
+    this.#tableWindow?.addEventListener(
+      "mousedown",
+      this.#onGestureMouseDown,
+      true,
+    );
+    this.#tableWindow?.addEventListener("click", this.#onGestureClick, true);
+
+    // The modifier may already be down when the table first renders.
+    this.#tableWindow?.toggleAttribute("data-modifier", this.#modifierHeld);
   }
 
   // ── Computed ───────────────────────────────────────────────────────
@@ -492,8 +649,26 @@ export class DuiDataTablePrimitive<
 
   // ── Selection handling ────────────────────────────────────────────
 
+  /** Set the anchor and re-snapshot the base selection it ranges from. */
+  #setAnchor(key: string, selection: Iterable<string>): void {
+    this.#anchorKey = key;
+    this.#baseKeys = new Set(selection);
+  }
+
+  #dropAnchor(): void {
+    this.#anchorKey = null;
+    this.#baseKeys = null;
+  }
+
   #emitSelection(nextKeys: string[]): void {
     const next = new Set(nextKeys);
+
+    // Emission hygiene: a proposal identical to the current selection is
+    // noise. Still recorded, so an unchanged set echoed back by the consumer
+    // doesn't read as divergence.
+    this.#lastProposal = next;
+    if (sameKeys(next, this.selectedKeys)) return;
+
     const rowKey = this.rowKey;
     const selectedRows = rowKey
       ? this.data.filter((row) => next.has(rowKey(row)))
@@ -519,7 +694,40 @@ export class DuiDataTablePrimitive<
     const current = new Set(this.selectedKeys);
     if (checked) current.add(key);
     else current.delete(key);
+
+    // A checkbox click is an anchor-setting gesture, so shift-clicking a second
+    // checkbox extends from here.
+    this.#setAnchor(key, current);
     this.#emitSelection([...current]);
+  }
+
+  /** Cmd-click: toggle one row, then re-anchor on it with a fresh base. */
+  #toggleRow(key: string): void {
+    const next = new Set(this.selectedKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+
+    this.#setAnchor(key, next);
+    this.#emitSelection([...next]);
+  }
+
+  /** Shift-click: `base ∪ range(anchor, target)`. Anchor and base are kept. */
+  #extendRange(targetKey: string): void {
+    const rowKey = this.rowKey;
+    if (!rowKey) return;
+
+    const range = this.#anchorKey === null
+      ? []
+      : resolveRange(this.#displayRows.map(rowKey), this.#anchorKey, targetKey);
+
+    // No anchor is a common state, not an edge case — every page change
+    // produces one — so degrade to a cmd-click rather than a dead gesture.
+    if (range.length === 0) {
+      this.#toggleRow(targetKey);
+      return;
+    }
+
+    this.#emitSelection([...new Set([...(this.#baseKeys ?? []), ...range])]);
   }
 
   /** Select-all / clear-all over the current filtered set (multiple only). */
@@ -528,6 +736,10 @@ export class DuiDataTablePrimitive<
     if (!rowKey) return;
 
     const filteredKeys = this.#filtered.map(rowKey);
+
+    // Select-all is a bulk verb with no row behind it: it drops the anchor
+    // rather than setting one.
+    this.#dropAnchor();
 
     if (checked) {
       // Union: preserve any selections outside the current filter.
@@ -542,6 +754,150 @@ export class DuiDataTablePrimitive<
       );
     }
   }
+
+  // ── Modifier gestures ─────────────────────────────────────────────
+
+  /** Modifier gestures are a desktop accelerator, and `multiple` only. */
+  get #gesturesEnabled(): boolean {
+    return this.selectionMode === "multiple" && this.rowKey != null;
+  }
+
+  /**
+   * Track the selection modifiers so the rows can drop the I-beam while one is
+   * down: with a modifier held a click selects rather than placing a text
+   * caret, so a text cursor would be advertising the wrong gesture.
+   */
+  #onModifierKey = (e: Event): void => {
+    this.#setModifierHeld(this.#gestureForModifiers(e as KeyboardEvent) != null);
+  };
+
+  #onWindowBlur = (): void => this.#setModifierHeld(false);
+
+  #setModifierHeld(held: boolean): void {
+    const next = held && this.#gesturesEnabled;
+    if (next === this.#modifierHeld) return;
+
+    this.#modifierHeld = next;
+    // Set imperatively rather than through `render()`: this fires on every
+    // press of a common modifier, and it must not re-render every row to do it.
+    this.#tableWindow?.toggleAttribute("data-modifier", next);
+  }
+
+  /**
+   * Which gesture a modifier combination names, if any. Shared by the pointer
+   * handlers and the cursor, so the cursor changes exactly when a gesture is
+   * live.
+   *
+   * The toggle modifier is `metaKey` on Apple platforms and `ctrlKey`
+   * elsewhere — never both, or a macOS ctrl-click would open the context menu
+   * *and* toggle the row.
+   */
+  #gestureForModifiers(
+    m: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean },
+  ): ModifierGesture | null {
+    const apple = isApplePlatform();
+    if (apple && m.ctrlKey) return null; // context-menu gesture on macOS
+
+    if (m.shiftKey) return "range";
+    return (apple ? m.metaKey : m.ctrlKey) ? "toggle" : null;
+  }
+
+  /** Which modifier gesture a pointer event carries, if any. */
+  #gestureFor(e: MouseEvent): ModifierGesture | null {
+    if (!this.#gesturesEnabled) return null;
+    if (e.button !== 0) return null;
+    return this.#gestureForModifiers(e);
+  }
+
+  /**
+   * Resolve a pointer event to the body row it landed on. Returns `null` for
+   * header clicks, the empty-state row, and anything outside a row — the
+   * header keeps its existing sort / select-all behaviour under modifiers.
+   */
+  #resolveGestureTarget(e: Event): { key: string; overLink: boolean } | null {
+    const rowKey = this.rowKey;
+    if (!rowKey) return null;
+
+    let overLink = false;
+    let row: Element | null = null;
+
+    for (const node of e.composedPath()) {
+      if (node === e.currentTarget) break;
+      if (!(node instanceof Element)) continue;
+      if (node.localName === "thead") return null;
+      if (node.localName === "a" && node.hasAttribute("href")) overLink = true;
+      if (node.localName === "tr") row = node;
+    }
+
+    const body = row?.parentElement;
+    if (!row || body?.localName !== "tbody") return null;
+
+    // Row order in the DOM is `#displayRows` order.
+    const index = Array.prototype.indexOf.call(body.children, row);
+    const rowData = this.#displayRows[index];
+    if (rowData === undefined) return null; // the empty-state row
+
+    return { key: rowKey(rowData), overLink };
+  }
+
+  /**
+   * A gesture the row owns, i.e. one we intercept. Cmd-click is the single
+   * carve-out: it yields to `a[href]` so "open in new tab" keeps working.
+   * Shift-click does not yield — native shift-click opens a new window, which
+   * nobody invokes deliberately, and the name column is a link in most tables.
+   */
+  #claimGesture(
+    e: MouseEvent,
+  ): { gesture: ModifierGesture; key: string } | null {
+    const gesture = this.#gestureFor(e);
+    if (!gesture) return null;
+
+    const target = this.#resolveGestureTarget(e);
+    if (!target) return null;
+    if (gesture === "toggle" && target.overLink) return null;
+
+    return { gesture, key: target.key };
+  }
+
+  /**
+   * `preventDefault()` here is what suppresses the browser's native
+   * shift-extends-text-selection: without it, clicking one row's text and
+   * shift-clicking another's selects everything between.
+   */
+  #onGestureMouseDown = (e: Event): void => {
+    if (!this.#claimGesture(e as MouseEvent)) return;
+    e.preventDefault();
+  };
+
+  #onGestureClick = (e: Event): void => {
+    const claimed = this.#claimGesture(e as MouseEvent);
+    if (!claimed) return;
+
+    // Starve everything inside the row: the checkbox's own click listener, a
+    // button in a cell, a link on shift-click, and our own `row-click`. The
+    // modifier means "select", so it means that everywhere on the row.
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (claimed.gesture === "toggle") this.#toggleRow(claimed.key);
+    else this.#extendRange(claimed.key);
+
+    // The `preventDefault()` above also suppressed the focus move, which would
+    // otherwise leave Escape dead right after the gesture that most calls for
+    // it. Programmatic focus after a pointer interaction shows no focus ring.
+    this.#tableWindow?.focus();
+  };
+
+  #onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key !== "Escape") return;
+    if (!this.#selectionEnabled || this.selectedKeys.length === 0) return;
+
+    // Only stop propagation when we actually handled it, so a table inside a
+    // dialog clears the selection on the first Escape and closes on the second.
+    e.stopPropagation();
+    this.#dropAnchor();
+    this.#emitSelection([]);
+  };
 
   // ── Row-click handling ────────────────────────────────────────────
 
@@ -764,7 +1120,12 @@ export class DuiDataTablePrimitive<
   override render(): TemplateResult {
     return html`
       <div class="DataTable" part="root">
-        <div class="TableWindow" part="table-window">
+        <div
+          class="TableWindow"
+          part="table-window"
+          tabindex="-1"
+          @keydown=${this.#onKeyDown}
+        >
           <table part="table">
             ${this.#renderHeader()} ${this.#renderBody()}
           </table>

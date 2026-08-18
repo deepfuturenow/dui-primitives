@@ -2,6 +2,7 @@ export { base } from "./base.ts";
 export {
   getRootDocument,
   getComposedFocusableElements,
+  isApplePlatform,
   queryComposedTree,
   queryComposedAutofocus,
 } from "./dom.ts";
