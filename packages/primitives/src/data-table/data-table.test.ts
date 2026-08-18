@@ -5,6 +5,7 @@ import {
   deriveSelectAllState,
   filterData,
   paginateData,
+  resolveRange,
   resolveValue,
   sortData,
   totalPages,
@@ -160,4 +161,121 @@ Deno.test("deriveSelectAllState considers only the filtered keys", () => {
     checked: true,
     indeterminate: false,
   });
+});
+
+// ── resolveRange ────────────────────────────────────────────────────────
+
+const ORDER = ["a", "b", "c", "d", "e", "f"];
+
+Deno.test("resolveRange returns the keys between anchor and target", () => {
+  assertEquals(resolveRange(ORDER, "b", "e"), ["b", "c", "d", "e"]);
+});
+
+Deno.test("resolveRange is order-agnostic: target above the anchor", () => {
+  assertEquals(resolveRange(ORDER, "e", "b"), ["b", "c", "d", "e"]);
+});
+
+Deno.test("resolveRange of a key with itself is that single key", () => {
+  assertEquals(resolveRange(ORDER, "c", "c"), ["c"]);
+});
+
+Deno.test("resolveRange returns [] when either key is absent", () => {
+  assertEquals(resolveRange(ORDER, "z", "c"), []);
+  assertEquals(resolveRange(ORDER, "c", "z"), []);
+  assertEquals(resolveRange([], "a", "b"), []);
+});
+
+// ── Gesture algebra ─────────────────────────────────────────────────────
+// A model of the component's `#toggleRow` / `#extendRange` over the pure
+// helper, so the traces in the spec are executable without a DOM. Keep this in
+// step with those two methods; the DOM plumbing around them (capture-phase
+// handling, the link carve-out, anchor lifetime) is not covered here.
+
+class GestureModel {
+  #ordered: string[];
+  #selected = new Set<string>();
+  #anchor: string | null = null;
+  #base: ReadonlySet<string> | null = null;
+
+  constructor(ordered: string[]) {
+    this.#ordered = ordered;
+  }
+
+  /** Cmd-click, and the checkbox click, which share anchor-setting semantics. */
+  cmdClick(key: string): this {
+    const next = new Set(this.#selected);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+
+    this.#selected = next;
+    this.#anchor = key;
+    this.#base = new Set(next);
+    return this;
+  }
+
+  shiftClick(key: string): this {
+    const range = this.#anchor === null
+      ? []
+      : resolveRange(this.#ordered, this.#anchor, key);
+
+    if (range.length === 0) return this.cmdClick(key);
+
+    this.#selected = new Set([...(this.#base ?? []), ...range]);
+    return this;
+  }
+
+  /** Every anchor-invalidating event: sort, filter, page change, select-all. */
+  dropAnchor(): this {
+    this.#anchor = null;
+    this.#base = null;
+    return this;
+  }
+
+  /** Selected keys in display order. */
+  keys(): string[] {
+    return this.#ordered.filter((k) => this.#selected.has(k));
+  }
+}
+
+const rowKeys = (...ns: number[]) => ns.map((n) => `r${n}`);
+const ROWS = Array.from({ length: 30 }, (_, i) => `r${i + 1}`);
+const model = () => new GestureModel(ROWS);
+
+Deno.test("shift-click extends from the anchor", () => {
+  const sel = model().cmdClick("r3").shiftClick("r9");
+  assertEquals(sel.keys(), rowKeys(3, 4, 5, 6, 7, 8, 9));
+});
+
+Deno.test("a second shift-click recomputes rather than accumulates", () => {
+  // {3} → shift 9 → shift 12 → shift 5 contracts back to {3,4,5}.
+  const sel = model().cmdClick("r3").shiftClick("r9").shiftClick("r12");
+  assertEquals(sel.keys(), rowKeys(3, 4, 5, 6, 7, 8, 9, 10, 11, 12));
+
+  sel.shiftClick("r5");
+  assertEquals(sel.keys(), rowKeys(3, 4, 5));
+});
+
+Deno.test("cmd-click re-snapshots the base, so prior selections survive", () => {
+  const sel = model()
+    .cmdClick("r3").shiftClick("r5") // {3,4,5}
+    .cmdClick("r20") // anchor moves, base becomes {3,4,5,20}
+    .shiftClick("r25");
+
+  assertEquals(sel.keys(), rowKeys(3, 4, 5, 20, 21, 22, 23, 24, 25));
+});
+
+Deno.test("shift-click with no anchor behaves as a cmd-click", () => {
+  // The state after any page/sort/filter change.
+  const sel = model().cmdClick("r3").shiftClick("r9").dropAnchor();
+  sel.shiftClick("r20");
+  assertEquals(sel.keys(), rowKeys(3, 4, 5, 6, 7, 8, 9, 20));
+
+  // …and the next shift-click extends from the anchor it just set.
+  sel.shiftClick("r22");
+  assertEquals(sel.keys(), rowKeys(3, 4, 5, 6, 7, 8, 9, 20, 21, 22));
+});
+
+Deno.test("cmd-click toggles a selected row back off", () => {
+  const sel = model().cmdClick("r3").shiftClick("r5").cmdClick("r4");
+  assertEquals(sel.keys(), rowKeys(3, 5));
 });

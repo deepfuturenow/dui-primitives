@@ -1,6 +1,10 @@
 import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ColumnDef } from "@dui/primitives/data-table";
+import { isApplePlatform } from "@dui/primitives/core/dom";
+
+/** The row-toggle modifier, as the reader's own platform spells it. */
+const MODIFIER = isApplePlatform() ? "⌘" : "Ctrl";
 
 // ── Demo data ───────────────────────────────────────────────────────────
 
@@ -163,6 +167,14 @@ export class DocsPageDataTable extends LitElement {
           selects all across the filtered set (indeterminate when partial), and
           selection persists across sort and page changes.
         </p>
+        <p class="demo-note">
+          <strong>Range selection.</strong> ${MODIFIER}-click any part of a row
+          toggles it and drops an anchor; <strong>shift</strong>-click extends
+          from that anchor, and shift-clicking back inside the range contracts
+          it. <strong>Escape</strong> clears. A plain click never changes the
+          selection, so text stays selectable — and the anchor resets on sort,
+          filter or page change, so a range never spans pages.
+        </p>
         <div class="toolbar">
           <span>${selectedCount} of ${INVOICES.length} selected</span>
           <button
@@ -177,7 +189,7 @@ export class DocsPageDataTable extends LitElement {
           .rowKey=${this.#rowKey}
           selection-mode="multiple"
           .selectedKeys=${this.#selectedKeys}
-          page-size="5"
+          page-size="10"
           @selection-change=${(e: CustomEvent<{ selectedKeys: string[] }>) => {
             this.#selectedKeys = e.detail.selectedKeys;
           }}

@@ -5,6 +5,33 @@
 
 export type GetRootDocumentOptions = { composed?: boolean };
 
+let applePlatform: boolean | undefined;
+
+/**
+ * Whether the current platform is an Apple one (macOS, iOS, iPadOS).
+ *
+ * Use this to pick the platform's *toggle* modifier — `metaKey` on Apple,
+ * `ctrlKey` everywhere else — rather than accepting `metaKey || ctrlKey`
+ * universally, which would make a macOS ctrl-click both open the context menu
+ * and fire the gesture.
+ *
+ * Detected once and memoized; returns `false` when there is no `navigator`.
+ */
+export const isApplePlatform = (): boolean => {
+  if (applePlatform !== undefined) return applePlatform;
+
+  if (typeof navigator === "undefined") return false;
+
+  const uaData = (navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  }).userAgentData;
+  const platform = uaData?.platform ?? navigator.platform ??
+    navigator.userAgent ?? "";
+
+  applePlatform = /mac|iphone|ipad|ipod/i.test(platform);
+  return applePlatform;
+};
+
 /**
  * Get the root node (Document or DocumentFragment) of a given node.
  *
