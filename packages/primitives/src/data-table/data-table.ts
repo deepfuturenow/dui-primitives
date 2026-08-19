@@ -194,6 +194,35 @@ export function clampPage(page: number, pages: number): number {
 }
 
 /**
+ * Resolve the page to render from the controlled property and the internal
+ * fallback, and say whether the controlled value needs a correction.
+ *
+ * `controlled` is `undefined` in uncontrolled mode, where the clamp is applied
+ * silently to the internal page (as it always has been). When it is set, the
+ * component still renders the clamped page — a consumer that forgets to reset
+ * on a filter change must not strand its users on page 9 of a two-page result —
+ * but it must not silently rewrite the consumer's value either. So the clamp
+ * comes back as a `proposal`, for the caller to emit as a `page-change`.
+ *
+ * `proposal` is `undefined` whenever there is nothing to correct, which
+ * includes every uncontrolled call. A consumer that honours the proposal comes
+ * back with `controlled === page` and gets no further proposal: a fixed point.
+ */
+export function resolvePage(
+  { controlled, internal, totalPages }: {
+    controlled: number | undefined;
+    internal: number;
+    totalPages: number;
+  },
+): { page: number; proposal: number | undefined } {
+  const page = clampPage(controlled ?? internal, totalPages);
+  return {
+    page,
+    proposal: controlled !== undefined && page !== controlled ? page : undefined,
+  };
+}
+
+/**
  * Derive the header select-all checkbox state from the current filtered set.
  * `checked` when every filtered key is selected; `indeterminate` when some
  * (but not all) are.
@@ -371,6 +400,16 @@ const componentStyles = css`
  * Selection is controlled and keyed by `rowKey`: the component reflects
  * `selectedKeys` and emits the proposed next selection on change.
  *
+ * ### Pagination
+ *
+ * Uncontrolled by default: the component owns the page, the pager moves it, and
+ * a `data` / filter change resets to page 1. Set `page` to take that state over
+ * — the component then renders the page you give it and never mutates it,
+ * `page-change` becomes a proposal, and the reset on a `data` change is yours
+ * to make (or not, which is the point: replacing the array to edit one row
+ * should not knock the user back to page 1). `default-page` seeds the
+ * uncontrolled page and is ignored once `page` is set.
+ *
  * ### Range selection (`selection-mode="multiple"`)
  *
  * A Finder-style desktop accelerator layered on top of the checkbox column.
@@ -416,7 +455,9 @@ const componentStyles = css`
  *   (default `transparent`; set by the styled layer).
  *
  * @fires sort-change - Fired when a sortable column header is clicked. Detail: SortState
- * @fires page-change - Fired when the page changes. Detail: PageState
+ * @fires page-change - Fired when the page changes. With `page` set the detail
+ *   is a *proposal*: the component has not moved, and won't until `page` does.
+ *   Detail: PageState
  * @fires selection-change - Fired with the proposed next selection. Detail: { selectedKeys, selectedRows }
  * @fires row-click - Fired when a body row is clicked (not on interactive cell
  *   content). Suppressed when a modifier gesture claims the click, i.e. a
@@ -439,6 +480,21 @@ export class DuiDataTablePrimitive<
   /** Number of rows per page. Set to 0 to disable pagination. */
   @property({ type: Number, attribute: "page-size" })
   accessor pageSize: number = 10;
+
+  /**
+   * Current page, 1-based (controlled). When set, the component renders this
+   * page and never mutates it — the pager, sorting and an out-of-range clamp
+   * all propose changes through `page-change` instead.
+   *
+   * Not reflected: writing the component's own state back onto the attribute
+   * would blur the line between the two modes.
+   */
+  @property({ type: Number })
+  accessor page: number | undefined = undefined;
+
+  /** Initial page for uncontrolled mode. Ignored when `page` is set. */
+  @property({ type: Number, attribute: "default-page" })
+  accessor defaultPage: number = 1;
 
   /** Key function to derive a unique identifier from each row. Required for selection. */
   @property({ attribute: false })
@@ -481,6 +537,30 @@ export class DuiDataTablePrimitive<
   #filtered: T[] = [];
 
   /**
+   * The page actually on screen: `page` when controlled, `#page` when not,
+   * clamped into range either way. Derived in `willUpdate` alongside
+   * `#filtered`, so the two are always read from the same update.
+   */
+  #currentPage = 1;
+
+  /**
+   * The `(controlled, clamped)` pair we last proposed, so an out-of-range
+   * `page` the consumer declines to fix is not re-proposed on every unrelated
+   * re-render — a search box would otherwise emit one `page-change` per
+   * keystroke. Cleared once the page is back in range, so a later drift is
+   * proposed afresh. Rewriting `page` to a different out-of-range value is a
+   * new pair and does get its own proposal.
+   */
+  #lastPageProposal: { controlled: number; clamped: number } | null = null;
+
+  /**
+   * A clamp proposal queued by `willUpdate` for `updated` to dispatch. Emitting
+   * mid-update would hand the consumer a component whose render hasn't happened
+   * yet, and a `page` they set from the handler wouldn't reach this cycle.
+   */
+  #pendingPageProposal: number | null = null;
+
+  /**
    * The row a shift-click range extends from.
    *
    * Invariant: the anchor is a key present in `#displayRows`, or it is `null`.
@@ -514,6 +594,14 @@ export class DuiDataTablePrimitive<
   override connectedCallback(): void {
     super.connectedCallback();
 
+    // Uncontrolled seed, applied once — before the first render only, so
+    // moving the element in the DOM doesn't send it back to the default page.
+    // Later changes to `default-page` are ignored; internal navigation takes
+    // over from here.
+    if (!this.hasUpdated && this.page === undefined && this.defaultPage !== 1) {
+      this.#page = this.defaultPage;
+    }
+
     // Document-level, because the modifier can go down while the pointer is
     // over the table but focus is somewhere else entirely. Capture phase so a
     // wrapper that swallows key events can't leave the cursor stale.
@@ -542,11 +630,20 @@ export class DuiDataTablePrimitive<
     if (
       dataOrFilterChanged ||
       changed.has("pageSize") ||
+      changed.has("page") ||
       changed.has("#sort" as keyof this) ||
       changed.has("#page" as keyof this)
     ) {
-      // Reset page when the underlying (filtered) set changes.
-      if (dataOrFilterChanged) {
+      // Reset page when the underlying (filtered) set changes — but only in
+      // uncontrolled mode. This is the crux of the controlled property: the
+      // component can't tell "new filter, go to page 1" from "same list, one
+      // row edited, stay put", and only the consumer can.
+      //
+      // Skipped on the first update too, where every property counts as
+      // changed and there is no previous set to have changed from. Without
+      // that, the initial `.data` assignment would wipe `default-page`. It
+      // costs existing consumers nothing: `#page` is already 1 there.
+      if (dataOrFilterChanged && this.hasUpdated && this.page === undefined) {
         this.#page = 1;
       }
 
@@ -556,13 +653,25 @@ export class DuiDataTablePrimitive<
         this.globalFilterFn,
       );
 
-      // Defensive clamp: a shrinking set can't strand the view on an empty page.
-      this.#page = clampPage(this.#page, this.#totalPages);
+      // Clamp: a shrinking set can't strand the view on an empty page. Silent
+      // when uncontrolled; a proposal when the page belongs to the consumer.
+      const { page, proposal } = resolvePage({
+        controlled: this.page,
+        internal: this.#page,
+        totalPages: this.#totalPages,
+      });
+      if (this.page === undefined) this.#page = page;
+      this.#currentPage = page;
+      this.#queuePageProposal(proposal);
 
       const sorted = sortData(this.#filtered, this.#sort, this.columns);
 
       if (this.pageSize > 0) {
-        this.#displayRows = paginateData(sorted, this.#page, this.pageSize);
+        this.#displayRows = paginateData(
+          sorted,
+          this.#currentPage,
+          this.pageSize,
+        );
       } else {
         this.#displayRows = sorted;
       }
@@ -603,6 +712,15 @@ export class DuiDataTablePrimitive<
     this.#tableWindow?.toggleAttribute("data-modifier", this.#modifierHeld);
   }
 
+  override updated(): void {
+    const proposal = this.#pendingPageProposal;
+    if (proposal === null) return;
+    this.#pendingPageProposal = null;
+
+    // `#pageState.page` is the clamped page, which is the proposal itself.
+    this.dispatchEvent(pageChangeEvent(this.#pageState));
+  }
+
   // ── Computed ───────────────────────────────────────────────────────
 
   get #totalPages(): number {
@@ -611,7 +729,7 @@ export class DuiDataTablePrimitive<
 
   get #pageState(): PageState {
     return {
-      page: this.#page,
+      page: this.#currentPage,
       pageSize: this.pageSize,
       totalRows: this.#filtered.length,
       totalPages: this.#totalPages,
@@ -636,15 +754,49 @@ export class DuiDataTablePrimitive<
       this.#sort = { column, direction: "asc" };
     }
 
-    this.#page = 1;
+    if (this.page === undefined) this.#page = 1;
     this.dispatchEvent(sortChangeEvent(this.#sort));
+
+    // Sorting moves the page. In controlled mode it can't move it itself, so
+    // it proposes — otherwise sorting leaves the consumer on page 3 of a
+    // freshly re-sorted list with nothing to tell it. Uncontrolled stays
+    // silent, as it always has: emitting there too is the more correct
+    // behaviour, but it would be a new event for every existing consumer.
+    // The asymmetry is accepted, not endorsed, and expires at the next major.
+    if (this.page !== undefined && this.page !== 1) {
+      this.dispatchEvent(pageChangeEvent({ ...this.#pageState, page: 1 }));
+    }
   }
 
   // ── Pagination handling ───────────────────────────────────────────
 
   #goToPage(page: number): void {
-    this.#page = clampPage(page, this.#totalPages);
-    this.dispatchEvent(pageChangeEvent(this.#pageState));
+    const next = clampPage(page, this.#totalPages);
+    // Controlled: the pager proposes, the consumer moves us.
+    if (this.page === undefined) this.#page = next;
+    this.dispatchEvent(pageChangeEvent({ ...this.#pageState, page: next }));
+  }
+
+  /**
+   * Record a clamp proposal for `updated` to emit, unless it repeats the last
+   * one we sent. `undefined` means the page is in range and clears the memo.
+   */
+  #queuePageProposal(proposal: number | undefined): void {
+    if (proposal === undefined) {
+      this.#lastPageProposal = null;
+      return;
+    }
+
+    const controlled = this.page as number;
+    if (
+      this.#lastPageProposal?.controlled === controlled &&
+      this.#lastPageProposal.clamped === proposal
+    ) {
+      return;
+    }
+
+    this.#lastPageProposal = { controlled, clamped: proposal };
+    this.#pendingPageProposal = proposal;
   }
 
   // ── Selection handling ────────────────────────────────────────────
@@ -1069,10 +1221,11 @@ export class DuiDataTablePrimitive<
     if (this.pageSize <= 0 || this.#filtered.length === 0) return nothing;
 
     const total = this.#filtered.length;
-    const start = (this.#page - 1) * this.pageSize + 1;
-    const end = Math.min(this.#page * this.pageSize, total);
-    const isFirst = this.#page === 1;
-    const isLast = this.#page === this.#totalPages;
+    const current = this.#currentPage;
+    const start = (current - 1) * this.pageSize + 1;
+    const end = Math.min(current * this.pageSize, total);
+    const isFirst = current === 1;
+    const isLast = current === this.#totalPages;
 
     return html`
       <div class="Pagination" part="pagination">
@@ -1091,7 +1244,7 @@ export class DuiDataTablePrimitive<
           <button
             class="PageButton"
             ?disabled=${isFirst}
-            @click=${() => this.#goToPage(this.#page - 1)}
+            @click=${() => this.#goToPage(current - 1)}
             aria-label="Previous page"
           >
             <dui-icon style="--icon-size: var(--text-sm)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></dui-icon>
@@ -1099,7 +1252,7 @@ export class DuiDataTablePrimitive<
           <button
             class="PageButton"
             ?disabled=${isLast}
-            @click=${() => this.#goToPage(this.#page + 1)}
+            @click=${() => this.#goToPage(current + 1)}
             aria-label="Next page"
           >
             <dui-icon style="--icon-size: var(--text-sm)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></dui-icon>

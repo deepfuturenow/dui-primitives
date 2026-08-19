@@ -86,6 +86,19 @@ const COLUMNS: ColumnDef<Invoice>[] = [
   },
 ];
 
+// The controlled-pagination demo puts two tables side by side, so it uses a
+// narrow column set that fits without a horizontal scroll.
+const SPLIT_COLUMNS: ColumnDef<Invoice>[] = [
+  { key: "id", header: "Invoice", width: "110px" },
+  { key: "email", header: "Email" },
+  {
+    key: "amount",
+    header: "Amount",
+    width: "110px",
+    render: (v) => money(v),
+  },
+];
+
 // ── Page ────────────────────────────────────────────────────────────────
 
 @customElement("docs-page-data-table")
@@ -97,6 +110,20 @@ export class DocsPageDataTable extends LitElement {
   @state() accessor #query = "";
   @state() accessor #selectedKeys: string[] = [];
   @state() accessor #picked: Invoice | undefined = undefined;
+
+  // Controlled-pagination demo: the page lives here, and the rows are a local
+  // copy so an "edit" can rebuild the array the way a real one does.
+  @state() accessor #page = 3;
+  @state() accessor #rows: Invoice[] = INVOICES;
+  @state() accessor #edits = 0;
+
+  /** Edit one row the way an app does: a new array, with a new object in it. */
+  #editRow = () => {
+    this.#edits++;
+    this.#rows = this.#rows.map((row) =>
+      row.id === "INV-1013" ? { ...row, amount: row.amount + 50 } : row
+    );
+  };
 
   // Stable identities — recreating these each render would reset paging/state.
   #rowKey = (row: Invoice) => row.id;
@@ -159,6 +186,58 @@ export class DocsPageDataTable extends LitElement {
           .globalFilterFn=${this.#filterFn}
           page-size="6"
         ></dui-data-table>
+      </prim-demo>
+
+      <prim-demo label="Controlled pagination">
+        <p class="demo-note">
+          Pagination is uncontrolled by default: the table owns the page, and a
+          new <code>data</code> identity resets it to 1. Set <code>page</code>
+          to take that over — the table then renders the page you give it,
+          <code>page-change</code> becomes a <em>proposal</em>, and the reset is
+          yours to make or skip. <code>default-page</code> seeds the
+          uncontrolled page and is ignored once <code>page</code> is set.
+        </p>
+        <p class="demo-note">
+          Both tables start on page 3 and share the same rows. <strong>Edit a
+          row</strong> rebuilds the array, exactly as a <code>.map()</code> or a
+          refetch would: the uncontrolled table snaps back to page 1, the
+          controlled one stays put — the app knows this was one row changing,
+          not a new list.
+        </p>
+        <div class="toolbar">
+          <button class="btn" @click=${this.#editRow}>
+            Edit a row (INV-1013)
+          </button>
+          <span>
+            ${this.#edits} edit${this.#edits === 1 ? "" : "s"} · controlled page
+            is <strong>${this.#page}</strong>
+          </span>
+        </div>
+        <div class="split">
+          <div>
+            <h4 class="split-title">Uncontrolled — <code>default-page="3"</code></h4>
+            <dui-data-table
+              .columns=${SPLIT_COLUMNS}
+              .data=${this.#rows}
+              .rowKey=${this.#rowKey}
+              page-size="5"
+              default-page="3"
+            ></dui-data-table>
+          </div>
+          <div>
+            <h4 class="split-title">Controlled — <code>.page</code></h4>
+            <dui-data-table
+              .columns=${SPLIT_COLUMNS}
+              .data=${this.#rows}
+              .rowKey=${this.#rowKey}
+              page-size="5"
+              .page=${this.#page}
+              @page-change=${(e: CustomEvent<{ page: number }>) => {
+                this.#page = e.detail.page;
+              }}
+            ></dui-data-table>
+          </div>
+        </div>
       </prim-demo>
 
       <prim-demo label="Row selection (multiple)">
@@ -335,6 +414,23 @@ const STYLES = html`
       font-size: 13px;
       color: #6b7280;
     }
+    docs-page-data-table .split {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    docs-page-data-table .split-title {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #6b7280;
+    }
+    docs-page-data-table .split-title code {
+      text-transform: none;
+      letter-spacing: 0;
+    }
     docs-page-data-table .btn {
       padding: 5px 12px;
       font-size: 13px;
@@ -357,7 +453,8 @@ const STYLES = html`
     @media (prefers-color-scheme: dark) {
       docs-page-data-table .demo-note,
       docs-page-data-table .toolbar,
-      docs-page-data-table .status { color: #9ca3af; }
+      docs-page-data-table .status,
+      docs-page-data-table .split-title { color: #9ca3af; }
       docs-page-data-table code { background: #22222e; }
       docs-page-data-table dui-data-table {
         --data-table-selected-background: #1e2a44;
