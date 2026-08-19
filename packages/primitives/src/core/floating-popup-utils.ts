@@ -91,6 +91,39 @@ const fixedPlatform = {
   getOffsetParent: (): typeof window => window,
 };
 
+/**
+ * Find the element that actually scrolls inside a floating popup.
+ *
+ * A popup either scrolls itself (`.Popup` with `overflow-y: auto`) or delegates
+ * to a nested `<dui-scroll-area>`. Anything that measures overflow or drives
+ * `scrollTop` has to target the real scroller: assume `.Popup` on a delegating
+ * popup and you silently read `scrollHeight === clientHeight`, i.e. "nothing
+ * overflows", no matter how long the list is.
+ *
+ * Duck-typed on `scrollViewport` rather than importing the scroll-area class,
+ * so core utils don't pull a component into every popup's bundle.
+ *
+ * Returns null when there is no `.Popup` to resolve; callers decide the
+ * fallback.
+ */
+export const resolveScrollContainer = (
+  floating: HTMLElement,
+): HTMLElement | null => {
+  const popup = floating.classList.contains("Popup")
+    ? floating
+    : floating.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
+      floating.querySelector<HTMLElement>(".Popup");
+  if (!popup) return null;
+
+  const scrollArea = popup.querySelector<
+    HTMLElement & { scrollViewport?: HTMLElement | null }
+  >("dui-scroll-area");
+
+  // `scrollViewport` is null until the scroll-area has rendered; fall back to
+  // the popup rather than reporting "no scroller".
+  return scrollArea?.scrollViewport ?? popup;
+};
+
 // ---------------------------------------------------------------------------
 // alignInner — macOS-style "selected item overlays trigger" positioning
 // ---------------------------------------------------------------------------
@@ -152,12 +185,7 @@ export const alignInner = (options: AlignInnerOptions): Middleware => ({
     const clampedY = Math.max(minY, Math.min(y, maxY));
 
     // If we clamped, scroll the popup so the selected item stays visible.
-    // Top-layer components pass the `.Popup` as the floating element itself;
-    // the legacy portal positioner wrapped it in a shadow root.
-    const scrollContainer = floatingEl.classList.contains("Popup")
-      ? floatingEl
-      : floatingEl.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
-        floatingEl.querySelector<HTMLElement>(".Popup");
+    const scrollContainer = resolveScrollContainer(floatingEl);
     if (scrollContainer && clampedY !== y) {
       const scrollDelta = y - clampedY; // negative = we pushed down, positive = pushed up
       scrollContainer.scrollTop = Math.max(
@@ -213,11 +241,7 @@ export const computeFixedPosition = (
   // offset/flip/shift positioning, which keeps the popup anchored to the
   // trigger and lets the list scroll internally.
   const innerEl = options.alignToInner?.getElement() ?? null;
-  const scrollContainer = floating.classList.contains("Popup")
-    ? floating
-    : floating.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
-      floating.querySelector<HTMLElement>(".Popup") ??
-      floating;
+  const scrollContainer = resolveScrollContainer(floating) ?? floating;
   const listFits =
     scrollContainer.scrollHeight <= scrollContainer.clientHeight + 1;
   const useInnerAlign = innerEl != null && listFits;

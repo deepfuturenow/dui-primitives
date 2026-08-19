@@ -6,8 +6,10 @@ import { repeat } from "lit/directives/repeat.js";
 import { base } from "../core/base.ts";
 import { customEvent } from "../core/event.ts";
 import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
-import { ReopenGuard } from "../core/floating-popup-utils.ts";
-
+import {
+  ReopenGuard,
+  resolveScrollContainer,
+} from "../core/floating-popup-utils.ts";
 
 export type SelectOption = {
   label: string;
@@ -30,8 +32,8 @@ const hostStyles = css`
   :host {
     display: block;
     /* Allow the select to shrink below its content's intrinsic width when it
-       is a flex/grid item, so the .Value's ellipsis truncation actually
-       engages instead of the trigger pushing the surrounding layout wider. */
+      is a flex/grid item, so the .Value's ellipsis truncation actually
+      engages instead of the trigger pushing the surrounding layout wider. */
     min-width: 0;
   }
 `;
@@ -152,7 +154,11 @@ export class DuiSelectPrimitive extends LitElement {
   accessor disabled = false;
 
   /** Position the popup so the selected item overlays the trigger (macOS-style). */
-  @property({ type: Boolean, attribute: "align-item-to-trigger", reflect: true })
+  @property({
+    type: Boolean,
+    attribute: "align-item-to-trigger",
+    reflect: true,
+  })
   accessor alignItemToTrigger = true;
 
   /** Name for form submission. */
@@ -345,8 +351,7 @@ export class DuiSelectPrimitive extends LitElement {
   }
 
   #focusTrigger(): void {
-    const trigger =
-      this.shadowRoot?.querySelector<HTMLElement>(".Trigger");
+    const trigger = this.shadowRoot?.querySelector<HTMLElement>(".Trigger");
     trigger?.focus();
   }
 
@@ -360,9 +365,18 @@ export class DuiSelectPrimitive extends LitElement {
     const popup = this.shadowRoot?.querySelector<HTMLElement>(".Popup");
     const item = this.shadowRoot?.querySelector<HTMLElement>("[data-selected]");
     if (!popup || !item) return;
-    if (popup.scrollHeight <= popup.clientHeight) return;
-    popup.scrollTop = item.offsetTop -
-      (popup.clientHeight - item.offsetHeight) / 2;
+
+    const scroller = resolveScrollContainer(popup) ?? popup;
+    if (scroller.scrollHeight <= scroller.clientHeight) return;
+
+    // Measure via rects rather than `offsetTop`: if a `<dui-scroll-area>` owns
+    // scrolling, the item's offsetParent is no longer the scrolling element.
+    const itemRect = item.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const itemTop = itemRect.top - scrollerRect.top + scroller.scrollTop;
+
+    scroller.scrollTop = itemTop -
+      (scroller.clientHeight - itemRect.height) / 2;
   }
 
   // ---- Render ----
@@ -385,7 +399,15 @@ export class DuiSelectPrimitive extends LitElement {
       >
         <span class="ItemIndicator">
           ${isSelected
-            ? html`<dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></dui-icon>`
+            ? html`
+              <dui-icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </dui-icon>
+            `
             : nothing}
         </span>
         <span class="ItemText">${option.label}</span>
@@ -422,7 +444,13 @@ export class DuiSelectPrimitive extends LitElement {
           ${hasValue ? this.#displayValue : this.placeholder}
         </span>
         <span class="Icon">
-          <dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></dui-icon>
+          <dui-icon>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </dui-icon>
         </span>
       </div>
 
