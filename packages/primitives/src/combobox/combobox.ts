@@ -9,8 +9,6 @@ import { customEvent } from "../core/event.ts";
 import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
 import { ReopenGuard } from "../core/floating-popup-utils.ts";
 
-
-
 export type SelectOption = {
   label: string;
   value: string;
@@ -119,6 +117,10 @@ const componentStyles = css`
     inset: auto;
     margin: 0;
     border: none;
+    /* The UA sheet supplies 0.25em of padding. Reset it: the scroll-area is
+      capped at --dui-available-height, so padding here is added on top and
+      pushes the popup that much past the viewport edge. */
+    padding: 0;
     overflow: visible;
     opacity: 0;
     transition-property: opacity, transform, overlay, display;
@@ -230,8 +232,6 @@ export class DuiComboboxPrimitive extends LitElement {
     }
   }
 
-
-
   @state()
   accessor #highlightedIndex = -1;
 
@@ -252,8 +252,9 @@ export class DuiComboboxPrimitive extends LitElement {
       // triggered by typing — that must keep the just-entered character.
       if (!this.multiple && !this.#openingViaInput) {
         this.#inputValue = "";
-        const input =
-          this.shadowRoot?.querySelector<HTMLInputElement>(".Input");
+        const input = this.shadowRoot?.querySelector<HTMLInputElement>(
+          ".Input",
+        );
         if (input) input.value = "";
       }
     },
@@ -343,8 +344,9 @@ export class DuiComboboxPrimitive extends LitElement {
       case "Enter": {
         event.preventDefault();
         if (this.#popup.isOpen) {
-          const index =
-            this.#highlightedIndex >= 0 ? this.#highlightedIndex : 0;
+          const index = this.#highlightedIndex >= 0
+            ? this.#highlightedIndex
+            : 0;
           const option = filtered[index];
           if (option) {
             this.#selectOption(option);
@@ -471,7 +473,14 @@ export class DuiComboboxPrimitive extends LitElement {
             this.#removeValue(value);
           }}"
         >
-          <dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></dui-icon>
+          <dui-icon>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </dui-icon>
         </button>
       </span>
     `;
@@ -495,7 +504,17 @@ export class DuiComboboxPrimitive extends LitElement {
       >
         <span class="ItemText">${option.label}</span>
         <span class="ItemIndicator">
-          ${isSelected ? html`<dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></dui-icon>` : nothing}
+          ${isSelected
+            ? html`
+              <dui-icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </dui-icon>
+            `
+            : nothing}
         </span>
       </div>
     `;
@@ -522,7 +541,11 @@ export class DuiComboboxPrimitive extends LitElement {
             @mousemove="${this.#onListMouseMove}"
           >
             ${repeat(filtered, (option) => option.value, this.#renderItem)}
-            ${isEmpty ? html` <div class="Empty">No results</div> ` : nothing}
+            ${isEmpty
+              ? html`
+                <div class="Empty">No results</div>
+              `
+              : nothing}
           </div>
         </dui-scroll-area>
       </div>

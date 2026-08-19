@@ -25,12 +25,27 @@ const componentStyles = css`
     inset: auto;
     margin: 0;
     border: none;
+    /* The UA [popover] sheet supplies 0.25em of padding. Reset it: the inner
+      dui-scroll-area is capped at the same --dui-available-height as the
+      popup, so any padding here is added on top and pushes the popup that
+      much past the viewport edge — and makes the popup scroll a few px too,
+      fighting the scroll-area. */
+    padding: 0;
+    /* The inner dui-scroll-area owns scrolling. These two are the fallback for
+      when dui-scroll-area is not registered: the un-upgraded element stays
+      display:inline and ignores max-height, so without them a long menu would
+      overflow the popup entirely. */
     max-height: var(--dui-available-height, 240px);
     overflow-y: auto;
     overscroll-behavior: contain;
     opacity: 0;
     transition-property: opacity, transform, overlay, display;
     transition-behavior: allow-discrete;
+  }
+
+  dui-scroll-area {
+    max-height: var(--dui-available-height, 240px);
+    height: auto;
   }
 
   .Popup:popover-open {
@@ -95,7 +110,9 @@ export class DuiMenuPrimitive extends LitElement {
   // Items stay slotted in the light DOM (no portal teleport), so query the
   // host directly. Size-driven custom properties inherit to them naturally.
   get #items(): DuiMenuItemPrimitive[] {
-    return [...this.querySelectorAll("dui-menu-item")] as DuiMenuItemPrimitive[];
+    return [
+      ...this.querySelectorAll("dui-menu-item"),
+    ] as DuiMenuItemPrimitive[];
   }
 
   protected override updated(): void {
@@ -128,7 +145,8 @@ export class DuiMenuPrimitive extends LitElement {
     const item = event
       .composedPath()
       .find(
-        (el) => el instanceof HTMLElement && el.matches(DuiMenuItemPrimitive.tagName),
+        (el) =>
+          el instanceof HTMLElement && el.matches(DuiMenuItemPrimitive.tagName),
       ) as DuiMenuItemPrimitive | undefined;
     if (item && !item.disabled) {
       this.#popup.close();
@@ -238,15 +256,17 @@ export class DuiMenuPrimitive extends LitElement {
         style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
         @toggle="${this.#popup.handleToggle}"
       >
-        <div
-          class="Menu"
-          id="${this.#menuId}"
-          role="menu"
-          @click="${this.#onItemSlotClick}"
-          @mousemove="${this.#onMenuMouseMove}"
-        >
-          <slot></slot>
-        </div>
+        <dui-scroll-area>
+          <div
+            class="Menu"
+            id="${this.#menuId}"
+            role="menu"
+            @click="${this.#onItemSlotClick}"
+            @mousemove="${this.#onMenuMouseMove}"
+          >
+            <slot></slot>
+          </div>
+        </dui-scroll-area>
       </div>
     `;
   }
