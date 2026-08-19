@@ -135,25 +135,56 @@ All behavior — keyboard toggle, form participation, ARIA attributes, checked s
 
 ## Styling Surface
 
-Every primitive exposes CSS parts for styling:
+Primitives expose CSS parts for styling. Most name their outermost element
+`root`; compound primitives name their pieces instead (`dui-accordion-item`
+exposes `item`, `header`, `trigger`, `panel`, `content`).
 
 ```css
-/* ::part(root) is available on every component */
 dui-button::part(root) { ... }
 
 /* Complex components expose additional parts */
-dui-switch::part(track) { ... }
 dui-switch::part(thumb) { ... }
 dui-slider::part(track) { ... }
 dui-slider::part(thumb) { ... }
-dui-checkbox::part(control) { ... }
+dui-checkbox::part(indicator) { ... }
 
-/* State is reflected as data attributes */
+/* A pseudo-class may follow ::part() */
 dui-button::part(root):hover { ... }
-dui-switch::part(root)[data-checked] { ... }
-dui-checkbox::part(root)[data-checked] { ... }
-dui-accordion-item::part(root)[data-open] { ... }
 ```
+
+### Styling state
+
+State is exposed two ways, and which one you reach for depends on where your
+CSS lives.
+
+**From outside the component**, an attribute selector *cannot* follow
+`::part()` — `dui-switch::part(root)[data-checked]` is not a valid selector and
+never matches. Match on the host instead, or on a state-bearing part name where
+the component emits one:
+
+```css
+/* host attribute — reflected properties only, so controlled usage */
+dui-switch[checked]::part(root) { ... }
+dui-checkbox[checked]::part(root) { ... }
+
+/* state in the part name */
+dui-select::part(item-selected) { ... }
+dui-select::part(item-highlighted) { ... }
+```
+
+**From a stylesheet adopted into the shadow root** — how the
+[DUI design system](https://github.com/deepfuturenow/dui) layers its styles —
+the `data-*` attributes on inner elements are directly selectable, and they
+cover every state including uncontrolled ones:
+
+```css
+[part="root"][data-checked] { ... }
+[part="item"][data-open] { ... }
+```
+
+Note the gap: a primitive in uncontrolled mode (`default-checked` rather than
+`checked`) reflects nothing to its host, so its state is reachable only by the
+second route or via a state-bearing part name.
 
 Slot-based composition for content projection:
 
