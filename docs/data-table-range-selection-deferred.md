@@ -11,11 +11,17 @@ it.
 is written to be pasted into one issue: what it is, why it was deferred, what it depends on, and
 what was already decided so the design work does not have to be redone.
 
+The base feature landed in `7b46a33` and shipped in v2.2.0. Items 1, 3 and 4 are now filed — see the
+**Filed as** line under each heading. Items 2, 5 and 6 are still unfiled; this document remains their
+only record.
+
 Ordered roughly by value.
 
 ---
 
 ## 1. Fix: `row-click` fires after drag-to-copy
+
+**Filed as [#6](https://github.com/deepfuturenow/dui-primitives/issues/6).**
 
 **Type:** bug fix. Independent of everything else here — file and fix on its own merits.
 
@@ -105,6 +111,8 @@ scrolls instead. With the default `pageSize: 10` a drag never reaches an edge. T
 
 ## 3. Keyboard row navigation
 
+**Filed as [#7](https://github.com/deepfuturenow/dui-primitives/issues/7).**
+
 Arrow-key navigation over rows, with range extension.
 
 | Key | Behaviour |
@@ -166,6 +174,9 @@ click-to-focus behaviour on `dui-checkbox` before and after, and add a regressio
 ---
 
 ## 4. `row-dblclick` event
+
+**Filed as [#8](https://github.com/deepfuturenow/dui-primitives/issues/8), which depends on
+[#6](https://github.com/deepfuturenow/dui-primitives/issues/6).**
 
 A `row-dblclick` event so a consumer can build the full Finder model — cmd/shift to select,
 double-click to open.
