@@ -25,7 +25,7 @@ const componentStyles = css`
     inset: auto;
     margin: 0;
     border: none;
-    max-height: 240px;
+    max-height: var(--dui-available-height, 240px);
     overflow-y: auto;
     overscroll-behavior: contain;
     opacity: 0;
@@ -49,6 +49,10 @@ const componentStyles = css`
  *
  * @slot trigger - The element that opens the menu on click.
  * @slot default - `dui-menu-item` children rendered inside the popup.
+ * @cssprop [--dui-available-height] - Space between the trigger and the viewport
+ *   edge, published on every reposition. The popup caps itself against this, so
+ *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
+ *   before the first position is computed; set it yourself to impose a smaller cap.
  */
 export class DuiMenuPrimitive extends LitElement {
   static tagName = "dui-menu" as const;

@@ -136,7 +136,7 @@ const componentStyles = css`
   }
 
   dui-scroll-area {
-    max-height: 240px;
+    max-height: var(--dui-available-height, 240px);
     height: auto;
   }
 
@@ -169,6 +169,10 @@ const componentStyles = css`
  *   Detail: { value: string, option: SelectOption }
  * @fires values-change - Multi-select: fired when a value is toggled.
  *   Detail: { value: string, selected: boolean, values: Set<string> }
+ * @cssprop [--dui-available-height] - Space between the input and the viewport
+ *   edge, published on every reposition. The popup caps itself against this, so
+ *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
+ *   before the first position is computed; set it yourself to impose a smaller cap.
  */
 export class DuiComboboxPrimitive extends LitElement {
   static tagName = "dui-combobox" as const;

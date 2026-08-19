@@ -66,7 +66,7 @@ const componentStyles = css`
     inset: auto;
     margin: 0;
     border: none;
-    max-height: 240px;
+    max-height: var(--dui-available-height, 240px);
     overflow-y: auto;
     overscroll-behavior: contain;
     opacity: 0;
@@ -98,6 +98,10 @@ const componentStyles = css`
  * @csspart action - The left action button element.
  * @csspart divider - The vertical separator between action and trigger.
  * @csspart trigger - The right dropdown trigger button element.
+ * @cssprop [--dui-available-height] - Space between the trigger and the viewport
+ *   edge, published on every reposition. The popup caps itself against this, so
+ *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
+ *   before the first position is computed; set it yourself to impose a smaller cap.
  * @fires dui-action - Fired when the action button is clicked. Detail: {}
  */
 export class DuiSplitButtonPrimitive extends LitElement {

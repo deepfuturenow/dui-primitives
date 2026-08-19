@@ -22,7 +22,7 @@ export type FloatingPopupSide = "top" | "bottom";
 /** Double-rAF to ensure CSS starting-style is applied then removed. */
 export const waitForAnimationFrame = (): Promise<void> =>
   new Promise<void>((r) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => r())),
+    requestAnimationFrame(() => requestAnimationFrame(() => r()))
   );
 
 /** Listen for transitionend with a fallback timeout. Guards against double-fire. */
@@ -69,12 +69,13 @@ export class ReopenGuard {
 }
 
 /** Render an arrow SVG pointing at the trigger. */
-export const renderArrow = (side: FloatingPopupSide): TemplateResult => html`
-  <svg class="Arrow" part="arrow" viewBox="0 0 10 6" data-side="${side}">
-    <polygon class="arrow-fill" points="0,0 5,6 10,0" />
-    <path class="arrow-stroke" d="M 0,0 L 5,6 L 10,0" />
-  </svg>
-`;
+export const renderArrow = (side: FloatingPopupSide): TemplateResult =>
+  html`
+    <svg class="Arrow" part="arrow" viewBox="0 0 10 6" data-side="${side}">
+      <polygon class="arrow-fill" points="0,0 5,6 10,0" />
+      <path class="arrow-stroke" d="M 0,0 L 5,6 L 10,0" />
+    </svg>
+  `;
 
 // ---------------------------------------------------------------------------
 // Centralized Floating UI positioning
@@ -130,15 +131,16 @@ export const alignInner = (options: AlignInnerOptions): Middleware => ({
     const innerRect = innerEl.getBoundingClientRect();
 
     // How far the inner element's vertical center is from the floating top
-    const innerOffsetY = (innerRect.top - floatingRect.top)
-      + innerRect.height / 2;
+    const innerOffsetY = (innerRect.top - floatingRect.top) +
+      innerRect.height / 2;
 
     // Determine the target Y center to align against. If a reference inner
     // element is provided, use its center (text-to-text alignment).
     // Otherwise fall back to the full reference rect center.
     const refInnerEl = options.getReferenceInner?.();
     const refCenterY = refInnerEl
-      ? refInnerEl.getBoundingClientRect().top + refInnerEl.getBoundingClientRect().height / 2
+      ? refInnerEl.getBoundingClientRect().top +
+        refInnerEl.getBoundingClientRect().height / 2
       : rects.reference.y + rects.reference.height / 2;
     let y = refCenterY - innerOffsetY;
 
@@ -158,7 +160,10 @@ export const alignInner = (options: AlignInnerOptions): Middleware => ({
         floatingEl.querySelector<HTMLElement>(".Popup");
     if (scrollContainer && clampedY !== y) {
       const scrollDelta = y - clampedY; // negative = we pushed down, positive = pushed up
-      scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - scrollDelta);
+      scrollContainer.scrollTop = Math.max(
+        0,
+        scrollContainer.scrollTop - scrollDelta,
+      );
     }
 
     y = clampedY;
@@ -221,27 +226,35 @@ export const computeFixedPosition = (
     ? [alignInner(options.alignToInner!)]
     : [offset(offsetPx), flip(), shift({ padding })];
 
-  if (matchWidth) {
-    middleware.push(
-      size({
-        apply({ rects, elements }) {
-          Object.assign(elements.floating.style, {
-            width: `${rects.reference.width}px`,
-          });
-        },
-      }),
-    );
-  } else if (minMatchWidth) {
-    middleware.push(
-      size({
-        apply({ rects, elements }) {
-          Object.assign(elements.floating.style, {
-            minWidth: `${rects.reference.width}px`,
-          });
-        },
-      }),
-    );
-  }
+  // A single `size` pass handles both width matching and publishing the
+  // available height. Two `size` middlewares would each re-measure and the
+  // second would clobber the first's `apply`.
+  middleware.push(
+    size({
+      padding,
+      apply({ rects, elements, availableHeight }) {
+        if (matchWidth) {
+          elements.floating.style.width = `${rects.reference.width}px`;
+        } else if (minMatchWidth) {
+          elements.floating.style.minWidth = `${rects.reference.width}px`;
+        }
+
+        // Publish the space between the anchor and the viewport edge so popups
+        // can cap themselves against the viewport rather than a magic number:
+        //
+        //   max-height: var(--dui-available-height, 240px);
+        //
+        // Read-only from a consumer's perspective — recomputed on every
+        // reposition — but a consumer may override it to impose a smaller cap.
+        // Set on the floating element so it inherits to descendants, including
+        // across shadow boundaries (e.g. a nested `<dui-scroll-area>`).
+        elements.floating.style.setProperty(
+          "--dui-available-height",
+          `${Math.max(0, Math.round(availableHeight))}px`,
+        );
+      },
+    }),
+  );
 
   return computePosition(anchor, floating, {
     placement,
@@ -265,7 +278,7 @@ export const startFixedAutoUpdate = (
       placement: Placement;
     }) => void;
   } = {},
-): (() => void) => {
+): () => void => {
   const { onPosition, ...positionOptions } = options;
 
   return autoUpdate(anchor, floating, () => {
