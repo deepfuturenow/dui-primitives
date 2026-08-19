@@ -290,6 +290,15 @@ const componentStyles = css`
 
   .TableWindow {
     overflow: auto;
+
+    /* A tabindex="-1" scripting target: the user can never tab here, so its
+       focus is never navigational and a ring communicates nothing. Without
+       this it inherits the UA default, because the preventDefault() in
+       #onGestureMouseDown stops the press from setting the document's input
+       modality to pointer — so :focus-visible matches the focus() that ends
+       the gesture. Consumers wanting a ring can add one via
+       ::part(table-window). */
+    outline: none;
   }
 
   table {
@@ -1036,8 +1045,10 @@ export class DuiDataTablePrimitive<
 
     // The `preventDefault()` above also suppressed the focus move, which would
     // otherwise leave Escape dead right after the gesture that most calls for
-    // it. Programmatic focus after a pointer interaction shows no focus ring.
-    this.#tableWindow?.focus();
+    // it. `preventScroll` because `.TableWindow` is a scroll container: the
+    // default would scroll it into view in every scroll ancestor, so a
+    // cmd-click on a partly-offscreen table would yank the page to it.
+    this.#tableWindow?.focus({ preventScroll: true });
   };
 
   #onKeyDown = (e: KeyboardEvent): void => {
