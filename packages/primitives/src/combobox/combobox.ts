@@ -9,8 +9,6 @@ import { customEvent } from "../core/event.ts";
 import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
 import { ReopenGuard } from "../core/floating-popup-utils.ts";
 
-
-
 export type SelectOption = {
   label: string;
   value: string;
@@ -119,6 +117,10 @@ const componentStyles = css`
     inset: auto;
     margin: 0;
     border: none;
+    /* The UA sheet supplies 0.25em of padding. Reset it: the scroll-area is
+      capped at --dui-available-height, so padding here is added on top and
+      pushes the popup that much past the viewport edge. */
+    padding: 0;
     overflow: visible;
     opacity: 0;
     transition-property: opacity, transform, overlay, display;
@@ -136,7 +138,7 @@ const componentStyles = css`
   }
 
   dui-scroll-area {
-    max-height: 240px;
+    max-height: var(--dui-available-height, 240px);
     height: auto;
   }
 
@@ -169,6 +171,21 @@ const componentStyles = css`
  *   Detail: { value: string, option: SelectOption }
  * @fires values-change - Multi-select: fired when a value is toggled.
  *   Detail: { value: string, selected: boolean, values: Set<string> }
+ * @csspart chips - The chip container shown in multi-select mode.
+ * @csspart input-wrapper - The single-select input container.
+ * @csspart popup - The floating list container.
+ * @csspart list - The scrolling list inside the popup.
+ * @csspart item - An option row.
+ * @csspart item-selected - Present on selected options. An attribute selector cannot
+ *   follow `::part()`, so state rides in the part name rather than `[data-selected]`.
+ * @csspart item-highlighted - Present on the keyboard-highlighted option.
+ * @csspart item-text - The option label.
+ * @csspart item-indicator - The check mark slot on each option.
+ * @csspart empty - The "No results" row.
+ * @cssprop [--dui-available-height] - Space between the input and the viewport
+ *   edge, published on every reposition. The popup caps itself against this, so
+ *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
+ *   before the first position is computed; set it yourself to impose a smaller cap.
  */
 export class DuiComboboxPrimitive extends LitElement {
   static tagName = "dui-combobox" as const;
@@ -226,8 +243,6 @@ export class DuiComboboxPrimitive extends LitElement {
     }
   }
 
-
-
   @state()
   accessor #highlightedIndex = -1;
 
@@ -248,8 +263,9 @@ export class DuiComboboxPrimitive extends LitElement {
       // triggered by typing — that must keep the just-entered character.
       if (!this.multiple && !this.#openingViaInput) {
         this.#inputValue = "";
-        const input =
-          this.shadowRoot?.querySelector<HTMLInputElement>(".Input");
+        const input = this.shadowRoot?.querySelector<HTMLInputElement>(
+          ".Input",
+        );
         if (input) input.value = "";
       }
     },
@@ -311,6 +327,29 @@ export class DuiComboboxPrimitive extends LitElement {
     }
   };
 
+  /**
+   * Move the highlight and keep it on screen.
+   *
+   * The highlight is virtual — `#highlightedIndex` plus `aria-activedescendant`,
+   * with DOM focus staying on the input — so the browser's "scroll the focused
+   * element into view" behaviour never fires and nothing else compensates.
+   * Without this, arrowing past the fold walks the highlight out of sight while
+   * the scroll position sits still. Follows `command-item`, which already does
+   * this on selection.
+   *
+   * `block: "nearest"` is deliberate: it scrolls the minimum distance, so
+   * stepping one row past the fold advances by one row rather than jumping the
+   * list, and it is a no-op when the option is already visible.
+   */
+  #moveHighlight(index: number): void {
+    this.#highlightedIndex = index;
+    this.updateComplete.then(() => {
+      this.shadowRoot
+        ?.querySelector<HTMLElement>("[data-highlighted]")
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
   #onInputKeyDown = (event: KeyboardEvent): void => {
     const filtered = this.#filteredOptions;
 
@@ -320,9 +359,8 @@ export class DuiComboboxPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           if (!this.disabled) this.#popup.open();
         } else {
-          this.#highlightedIndex = Math.min(
-            this.#highlightedIndex + 1,
-            filtered.length - 1,
+          this.#moveHighlight(
+            Math.min(this.#highlightedIndex + 1, filtered.length - 1),
           );
         }
         break;
@@ -332,15 +370,16 @@ export class DuiComboboxPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           if (!this.disabled) this.#popup.open();
         } else {
-          this.#highlightedIndex = Math.max(this.#highlightedIndex - 1, 0);
+          this.#moveHighlight(Math.max(this.#highlightedIndex - 1, 0));
         }
         break;
 
       case "Enter": {
         event.preventDefault();
         if (this.#popup.isOpen) {
-          const index =
-            this.#highlightedIndex >= 0 ? this.#highlightedIndex : 0;
+          const index = this.#highlightedIndex >= 0
+            ? this.#highlightedIndex
+            : 0;
           const option = filtered[index];
           if (option) {
             this.#selectOption(option);
@@ -368,14 +407,14 @@ export class DuiComboboxPrimitive extends LitElement {
       case "Home":
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = 0;
+          this.#moveHighlight(0);
         }
         break;
 
       case "End":
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = filtered.length - 1;
+          this.#moveHighlight(filtered.length - 1);
         }
         break;
 
@@ -467,11 +506,32 @@ export class DuiComboboxPrimitive extends LitElement {
             this.#removeValue(value);
           }}"
         >
-          <dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></dui-icon>
+          <dui-icon>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </dui-icon>
         </button>
       </span>
     `;
   };
+
+  /**
+   * State has to ride in the part *name*: an attribute selector cannot follow
+   * `::part()`, so `::part(item)[data-selected]` is not a valid selector. The
+   * `data-*` attributes stay for stylesheets injected into this shadow root
+   * (where `.Item[data-selected]` works); `::part(item-selected)` is the
+   * equivalent for consumers styling from outside.
+   */
+  #itemPart = (isSelected: boolean, isHighlighted: boolean): string =>
+    [
+      "item",
+      isSelected && "item-selected",
+      isHighlighted && "item-highlighted",
+    ].filter(Boolean).join(" ");
 
   #renderItem = (option: SelectOption, index: number): TemplateResult => {
     const isSelected = this.multiple
@@ -482,6 +542,7 @@ export class DuiComboboxPrimitive extends LitElement {
     return html`
       <div
         class="Item"
+        part="${this.#itemPart(isSelected, isHighlighted)}"
         role="option"
         id="${this.#listId}-option-${index}"
         aria-selected="${isSelected}"
@@ -489,9 +550,19 @@ export class DuiComboboxPrimitive extends LitElement {
         ?data-highlighted="${isHighlighted}"
         @click="${() => this.#onItemClick(option)}"
       >
-        <span class="ItemText">${option.label}</span>
-        <span class="ItemIndicator">
-          ${isSelected ? html`<dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></dui-icon>` : nothing}
+        <span class="ItemText" part="item-text">${option.label}</span>
+        <span class="ItemIndicator" part="item-indicator">
+          ${isSelected
+            ? html`
+              <dui-icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </dui-icon>
+            `
+            : nothing}
         </span>
       </div>
     `;
@@ -504,12 +575,14 @@ export class DuiComboboxPrimitive extends LitElement {
     return html`
       <div
         class="Popup"
+        part="popup"
         popover="auto"
         @toggle="${this.#popup.handleToggle}"
       >
         <dui-scroll-area>
           <div
             class="List"
+            part="list"
             id="${this.#listId}"
             role="listbox"
             aria-labelledby="${this.#inputId}"
@@ -518,7 +591,11 @@ export class DuiComboboxPrimitive extends LitElement {
             @mousemove="${this.#onListMouseMove}"
           >
             ${repeat(filtered, (option) => option.value, this.#renderItem)}
-            ${isEmpty ? html` <div class="Empty">No results</div> ` : nothing}
+            ${isEmpty
+              ? html`
+                <div class="Empty" part="empty">No results</div>
+              `
+              : nothing}
           </div>
         </dui-scroll-area>
       </div>

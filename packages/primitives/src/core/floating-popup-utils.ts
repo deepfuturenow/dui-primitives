@@ -22,7 +22,7 @@ export type FloatingPopupSide = "top" | "bottom";
 /** Double-rAF to ensure CSS starting-style is applied then removed. */
 export const waitForAnimationFrame = (): Promise<void> =>
   new Promise<void>((r) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => r())),
+    requestAnimationFrame(() => requestAnimationFrame(() => r()))
   );
 
 /** Listen for transitionend with a fallback timeout. Guards against double-fire. */
@@ -69,12 +69,13 @@ export class ReopenGuard {
 }
 
 /** Render an arrow SVG pointing at the trigger. */
-export const renderArrow = (side: FloatingPopupSide): TemplateResult => html`
-  <svg class="Arrow" part="arrow" viewBox="0 0 10 6" data-side="${side}">
-    <polygon class="arrow-fill" points="0,0 5,6 10,0" />
-    <path class="arrow-stroke" d="M 0,0 L 5,6 L 10,0" />
-  </svg>
-`;
+export const renderArrow = (side: FloatingPopupSide): TemplateResult =>
+  html`
+    <svg class="Arrow" part="arrow" viewBox="0 0 10 6" data-side="${side}">
+      <polygon class="arrow-fill" points="0,0 5,6 10,0" />
+      <path class="arrow-stroke" d="M 0,0 L 5,6 L 10,0" />
+    </svg>
+  `;
 
 // ---------------------------------------------------------------------------
 // Centralized Floating UI positioning
@@ -88,6 +89,39 @@ export const renderArrow = (side: FloatingPopupSide): TemplateResult => html`
 const fixedPlatform = {
   ...platform,
   getOffsetParent: (): typeof window => window,
+};
+
+/**
+ * Find the element that actually scrolls inside a floating popup.
+ *
+ * A popup either scrolls itself (`.Popup` with `overflow-y: auto`) or delegates
+ * to a nested `<dui-scroll-area>`. Anything that measures overflow or drives
+ * `scrollTop` has to target the real scroller: assume `.Popup` on a delegating
+ * popup and you silently read `scrollHeight === clientHeight`, i.e. "nothing
+ * overflows", no matter how long the list is.
+ *
+ * Duck-typed on `scrollViewport` rather than importing the scroll-area class,
+ * so core utils don't pull a component into every popup's bundle.
+ *
+ * Returns null when there is no `.Popup` to resolve; callers decide the
+ * fallback.
+ */
+export const resolveScrollContainer = (
+  floating: HTMLElement,
+): HTMLElement | null => {
+  const popup = floating.classList.contains("Popup")
+    ? floating
+    : floating.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
+      floating.querySelector<HTMLElement>(".Popup");
+  if (!popup) return null;
+
+  const scrollArea = popup.querySelector<
+    HTMLElement & { scrollViewport?: HTMLElement | null }
+  >("dui-scroll-area");
+
+  // `scrollViewport` is null until the scroll-area has rendered; fall back to
+  // the popup rather than reporting "no scroller".
+  return scrollArea?.scrollViewport ?? popup;
 };
 
 // ---------------------------------------------------------------------------
@@ -130,15 +164,16 @@ export const alignInner = (options: AlignInnerOptions): Middleware => ({
     const innerRect = innerEl.getBoundingClientRect();
 
     // How far the inner element's vertical center is from the floating top
-    const innerOffsetY = (innerRect.top - floatingRect.top)
-      + innerRect.height / 2;
+    const innerOffsetY = (innerRect.top - floatingRect.top) +
+      innerRect.height / 2;
 
     // Determine the target Y center to align against. If a reference inner
     // element is provided, use its center (text-to-text alignment).
     // Otherwise fall back to the full reference rect center.
     const refInnerEl = options.getReferenceInner?.();
     const refCenterY = refInnerEl
-      ? refInnerEl.getBoundingClientRect().top + refInnerEl.getBoundingClientRect().height / 2
+      ? refInnerEl.getBoundingClientRect().top +
+        refInnerEl.getBoundingClientRect().height / 2
       : rects.reference.y + rects.reference.height / 2;
     let y = refCenterY - innerOffsetY;
 
@@ -150,15 +185,13 @@ export const alignInner = (options: AlignInnerOptions): Middleware => ({
     const clampedY = Math.max(minY, Math.min(y, maxY));
 
     // If we clamped, scroll the popup so the selected item stays visible.
-    // Top-layer components pass the `.Popup` as the floating element itself;
-    // the legacy portal positioner wrapped it in a shadow root.
-    const scrollContainer = floatingEl.classList.contains("Popup")
-      ? floatingEl
-      : floatingEl.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
-        floatingEl.querySelector<HTMLElement>(".Popup");
+    const scrollContainer = resolveScrollContainer(floatingEl);
     if (scrollContainer && clampedY !== y) {
       const scrollDelta = y - clampedY; // negative = we pushed down, positive = pushed up
-      scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - scrollDelta);
+      scrollContainer.scrollTop = Math.max(
+        0,
+        scrollContainer.scrollTop - scrollDelta,
+      );
     }
 
     y = clampedY;
@@ -208,11 +241,7 @@ export const computeFixedPosition = (
   // offset/flip/shift positioning, which keeps the popup anchored to the
   // trigger and lets the list scroll internally.
   const innerEl = options.alignToInner?.getElement() ?? null;
-  const scrollContainer = floating.classList.contains("Popup")
-    ? floating
-    : floating.shadowRoot?.querySelector<HTMLElement>(".Popup") ??
-      floating.querySelector<HTMLElement>(".Popup") ??
-      floating;
+  const scrollContainer = resolveScrollContainer(floating) ?? floating;
   const listFits =
     scrollContainer.scrollHeight <= scrollContainer.clientHeight + 1;
   const useInnerAlign = innerEl != null && listFits;
@@ -221,27 +250,35 @@ export const computeFixedPosition = (
     ? [alignInner(options.alignToInner!)]
     : [offset(offsetPx), flip(), shift({ padding })];
 
-  if (matchWidth) {
-    middleware.push(
-      size({
-        apply({ rects, elements }) {
-          Object.assign(elements.floating.style, {
-            width: `${rects.reference.width}px`,
-          });
-        },
-      }),
-    );
-  } else if (minMatchWidth) {
-    middleware.push(
-      size({
-        apply({ rects, elements }) {
-          Object.assign(elements.floating.style, {
-            minWidth: `${rects.reference.width}px`,
-          });
-        },
-      }),
-    );
-  }
+  // A single `size` pass handles both width matching and publishing the
+  // available height. Two `size` middlewares would each re-measure and the
+  // second would clobber the first's `apply`.
+  middleware.push(
+    size({
+      padding,
+      apply({ rects, elements, availableHeight }) {
+        if (matchWidth) {
+          elements.floating.style.width = `${rects.reference.width}px`;
+        } else if (minMatchWidth) {
+          elements.floating.style.minWidth = `${rects.reference.width}px`;
+        }
+
+        // Publish the space between the anchor and the viewport edge so popups
+        // can cap themselves against the viewport rather than a magic number:
+        //
+        //   max-height: var(--dui-available-height, 240px);
+        //
+        // Read-only from a consumer's perspective — recomputed on every
+        // reposition — but a consumer may override it to impose a smaller cap.
+        // Set on the floating element so it inherits to descendants, including
+        // across shadow boundaries (e.g. a nested `<dui-scroll-area>`).
+        elements.floating.style.setProperty(
+          "--dui-available-height",
+          `${Math.max(0, Math.round(availableHeight))}px`,
+        );
+      },
+    }),
+  );
 
   return computePosition(anchor, floating, {
     placement,
@@ -265,7 +302,7 @@ export const startFixedAutoUpdate = (
       placement: Placement;
     }) => void;
   } = {},
-): (() => void) => {
+): () => void => {
   const { onPosition, ...positionOptions } = options;
 
   return autoUpdate(anchor, floating, () => {

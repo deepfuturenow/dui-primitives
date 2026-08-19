@@ -41,8 +41,10 @@ const styles = css`
   }
 
   :host([fade]) .Viewport[data-scrolled] {
-    -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--scroll-fade-size, 1.5rem));
-    mask-image: linear-gradient(to bottom, transparent, black var(--scroll-fade-size, 1.5rem));
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black
+      var(--scroll-fade-size, 1.5rem));
+    mask-image: linear-gradient(to bottom, transparent, black
+      var(--scroll-fade-size, 1.5rem));
   }
 
   .Scrollbar {
@@ -136,9 +138,9 @@ export class DuiScrollAreaPrimitive extends LitElement {
 
   protected override willUpdate(changed: PropertyValues): void {
     if (changed.has("maxHeight")) {
-      if (this.maxHeight)
+      if (this.maxHeight) {
         this.style.setProperty("--scroll-area-max-height", this.maxHeight);
-      else this.style.removeProperty("--scroll-area-max-height");
+      } else this.style.removeProperty("--scroll-area-max-height");
     }
   }
 
@@ -240,6 +242,15 @@ export class DuiScrollAreaPrimitive extends LitElement {
 
   // --- Getters ---
 
+  /**
+   * The element that actually scrolls. Public so callers that need to measure
+   * or drive scrolling — positioning middleware, "scroll this item into view"
+   * helpers — can reach it without querying our private `.Viewport` class name.
+   */
+  get scrollViewport(): HTMLElement | null {
+    return this.#viewport;
+  }
+
   get #viewport(): HTMLElement | null {
     return this.shadowRoot?.querySelector(".Viewport") ?? null;
   }
@@ -277,17 +288,15 @@ export class DuiScrollAreaPrimitive extends LitElement {
   #updateThumbPosition = (vp: HTMLElement): void => {
     if (this.#hasOverflowY) {
       const maxScrollTop = vp.scrollHeight - vp.clientHeight;
-      this.#thumbTopPercent =
-        maxScrollTop > 0
-          ? (vp.scrollTop / maxScrollTop) * (100 - this.#thumbHeightPercent)
-          : 0;
+      this.#thumbTopPercent = maxScrollTop > 0
+        ? (vp.scrollTop / maxScrollTop) * (100 - this.#thumbHeightPercent)
+        : 0;
     }
     if (this.#hasOverflowX) {
       const maxScrollLeft = vp.scrollWidth - vp.clientWidth;
-      this.#thumbLeftPercent =
-        maxScrollLeft > 0
-          ? (vp.scrollLeft / maxScrollLeft) * (100 - this.#thumbWidthPercent)
-          : 0;
+      this.#thumbLeftPercent = maxScrollLeft > 0
+        ? (vp.scrollLeft / maxScrollLeft) * (100 - this.#thumbWidthPercent)
+        : 0;
     }
   };
 
@@ -304,8 +313,7 @@ export class DuiScrollAreaPrimitive extends LitElement {
     const scrolledUp = vp.scrollTop < this.#prevScrollTop;
 
     this.#isAtTop = vp.scrollTop <= 0;
-    this.#isAtBottom =
-      vp.scrollTop + vp.clientHeight >=
+    this.#isAtBottom = vp.scrollTop + vp.clientHeight >=
       vp.scrollHeight - DuiScrollAreaPrimitive.#SCROLL_BOTTOM_TOLERANCE;
 
     if (scrolledUp && wasAtBottom && !this.#isAtBottom) {
@@ -403,8 +411,8 @@ export class DuiScrollAreaPrimitive extends LitElement {
       const delta = event.clientY - this.#dragStartPointer;
       const trackHeight = track.clientHeight;
       const scrollRange = vp.scrollHeight - vp.clientHeight;
-      vp.scrollTop =
-        this.#dragStartScroll + (delta / trackHeight) * scrollRange;
+      vp.scrollTop = this.#dragStartScroll +
+        (delta / trackHeight) * scrollRange;
     } else {
       const track = this.shadowRoot?.querySelector(
         '.Scrollbar[data-orientation="horizontal"]',
@@ -413,8 +421,8 @@ export class DuiScrollAreaPrimitive extends LitElement {
       const delta = event.clientX - this.#dragStartPointer;
       const trackWidth = track.clientWidth;
       const scrollRange = vp.scrollWidth - vp.clientWidth;
-      vp.scrollLeft =
-        this.#dragStartScroll + (delta / trackWidth) * scrollRange;
+      vp.scrollLeft = this.#dragStartScroll +
+        (delta / trackWidth) * scrollRange;
     }
   };
 
@@ -487,7 +495,8 @@ export class DuiScrollAreaPrimitive extends LitElement {
         ?data-has-overflow-y="${this.#hasOverflowY}"
         ?data-scrolling="${this.#scrolling}"
       >
-        <div class="Viewport" part="viewport" ?data-scrolled="${!this.#isAtTop}" @scroll="${this.#onScroll}">
+        <div class="Viewport" part="viewport" ?data-scrolled="${!this
+          .#isAtTop}" @scroll="${this.#onScroll}">
           <slot></slot>
         </div>
         ${this.#renderVerticalScrollbar()} ${this.#renderHorizontalScrollbar()}

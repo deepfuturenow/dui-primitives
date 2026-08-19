@@ -66,12 +66,27 @@ const componentStyles = css`
     inset: auto;
     margin: 0;
     border: none;
-    max-height: 240px;
+    /* The UA [popover] sheet supplies 0.25em of padding. Reset it: the inner
+      dui-scroll-area is capped at the same --dui-available-height as the
+      popup, so any padding here is added on top and pushes the popup that
+      much past the viewport edge — and makes the popup scroll a few px too,
+      fighting the scroll-area. */
+    padding: 0;
+    /* The inner dui-scroll-area owns scrolling. These two are the fallback for
+      when dui-scroll-area is not registered: the un-upgraded element stays
+      display:inline and ignores max-height, so without them a long menu would
+      overflow the popup entirely. */
+    max-height: var(--dui-available-height, 240px);
     overflow-y: auto;
     overscroll-behavior: contain;
     opacity: 0;
     transition-property: opacity, transform, overlay, display;
     transition-behavior: allow-discrete;
+  }
+
+  dui-scroll-area {
+    max-height: var(--dui-available-height, 240px);
+    height: auto;
   }
 
   .Popup:popover-open {
@@ -98,6 +113,12 @@ const componentStyles = css`
  * @csspart action - The left action button element.
  * @csspart divider - The vertical separator between action and trigger.
  * @csspart trigger - The right dropdown trigger button element.
+ * @csspart popup - The floating menu container.
+ * @csspart menu - The scrolling list inside the popup.
+ * @cssprop [--dui-available-height] - Space between the trigger and the viewport
+ *   edge, published on every reposition. The popup caps itself against this, so
+ *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
+ *   before the first position is computed; set it yourself to impose a smaller cap.
  * @fires dui-action - Fired when the action button is clicked. Detail: {}
  */
 export class DuiSplitButtonPrimitive extends LitElement {
@@ -148,7 +169,9 @@ export class DuiSplitButtonPrimitive extends LitElement {
 
   // Items stay slotted in the light DOM (no portal teleport).
   get #items(): DuiMenuItemPrimitive[] {
-    return [...this.querySelectorAll("dui-menu-item")] as DuiMenuItemPrimitive[];
+    return [
+      ...this.querySelectorAll("dui-menu-item"),
+    ] as DuiMenuItemPrimitive[];
   }
 
   protected override updated(): void {
@@ -160,6 +183,13 @@ export class DuiSplitButtonPrimitive extends LitElement {
         items[i]!.removeAttribute("data-highlighted");
       }
     }
+
+    // The highlight is virtual — a data attribute, with DOM focus never moving
+    // to the item — so the browser never scrolls for us. Without this, arrowing
+    // past the fold walks the highlight out of sight while the scroll position
+    // sits still. `block: "nearest"` scrolls the minimum distance and is a
+    // no-op when the item is already visible.
+    items[this.#highlightedIndex]?.scrollIntoView({ block: "nearest" });
   }
 
   // ---- Action zone handlers ----
@@ -282,7 +312,8 @@ export class DuiSplitButtonPrimitive extends LitElement {
     const item = e
       .composedPath()
       .find(
-        (el) => el instanceof HTMLElement && el.matches(DuiMenuItemPrimitive.tagName),
+        (el) =>
+          el instanceof HTMLElement && el.matches(DuiMenuItemPrimitive.tagName),
       ) as DuiMenuItemPrimitive | undefined;
     if (item && !item.disabled) {
       this.#popup.close();
@@ -331,26 +362,32 @@ export class DuiSplitButtonPrimitive extends LitElement {
             <dui-icon>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
             </dui-icon>
           </slot>
         </button>
       </div>
       <div
         class="Popup"
+        part="popup"
         popover="auto"
         style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
         @toggle="${this.#popup.handleToggle}"
       >
-        <div
-          class="Menu"
-          id="${this.#menuId}"
-          role="menu"
-          @click="${this.#onItemSlotClick}"
-          @mousemove="${this.#onMenuMouseMove}"
-        >
-          <slot name="menu"></slot>
-        </div>
+        <dui-scroll-area>
+          <div
+            class="Menu"
+            part="menu"
+            id="${this.#menuId}"
+            role="menu"
+            @click="${this.#onItemSlotClick}"
+            @mousemove="${this.#onMenuMouseMove}"
+          >
+            <slot name="menu"></slot>
+          </div>
+        </dui-scroll-area>
       </div>
     `;
   }

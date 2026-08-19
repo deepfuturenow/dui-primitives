@@ -6,8 +6,10 @@ import { repeat } from "lit/directives/repeat.js";
 import { base } from "../core/base.ts";
 import { customEvent } from "../core/event.ts";
 import { FloatingTopLayerController } from "../core/floating-top-layer-controller.ts";
-import { ReopenGuard } from "../core/floating-popup-utils.ts";
-
+import {
+  ReopenGuard,
+  resolveScrollContainer,
+} from "../core/floating-popup-utils.ts";
 
 export type SelectOption = {
   label: string;
@@ -30,8 +32,8 @@ const hostStyles = css`
   :host {
     display: block;
     /* Allow the select to shrink below its content's intrinsic width when it
-       is a flex/grid item, so the .Value's ellipsis truncation actually
-       engages instead of the trigger pushing the surrounding layout wider. */
+      is a flex/grid item, so the .Value's ellipsis truncation actually
+      engages instead of the trigger pushing the surrounding layout wider. */
     min-width: 0;
   }
 `;
@@ -68,7 +70,17 @@ const componentStyles = css`
     inset: auto;
     margin: 0;
     border: none;
-    max-height: 240px;
+    /* The UA [popover] sheet supplies 0.25em of padding. Reset it: the inner
+      dui-scroll-area is capped at the same --dui-available-height as the
+      popup, so any padding here is added on top and pushes the popup that
+      much past the viewport edge — and makes the popup scroll a few px too,
+      fighting the scroll-area. */
+    padding: 0;
+    /* The inner dui-scroll-area owns scrolling. These two are the fallback for
+      when dui-scroll-area is not registered: the un-upgraded element stays
+      display:inline and ignores max-height, so without them a long list would
+      overflow the popup entirely. */
+    max-height: var(--dui-available-height, 240px);
     overflow-y: auto;
     overscroll-behavior: contain;
     opacity: 0;
@@ -84,6 +96,11 @@ const componentStyles = css`
     .Popup:popover-open {
       opacity: 0;
     }
+  }
+
+  dui-scroll-area {
+    max-height: var(--dui-available-height, 240px);
+    height: auto;
   }
 
   .Item {
@@ -116,6 +133,19 @@ const componentStyles = css`
  *
  * @csspart trigger - The trigger button.
  * @csspart value - The displayed value text.
+ * @csspart popup - The floating listbox container.
+ * @csspart listbox - The scrolling list inside the popup.
+ * @csspart item - An option row.
+ * @csspart item-selected - Present on the selected option. An attribute selector cannot
+ *   follow `::part()`, so state rides in the part name rather than `[data-selected]`.
+ * @csspart item-highlighted - Present on the keyboard-highlighted option.
+ * @csspart item-disabled - Present on disabled options.
+ * @csspart item-indicator - The check mark slot on each option.
+ * @csspart item-text - The option label.
+ * @cssprop [--dui-available-height] - Space between the trigger and the viewport
+ *   edge, published on every reposition. The popup caps itself against this, so
+ *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
+ *   before the first position is computed; set it yourself to impose a smaller cap.
  * @fires value-change - Fired when the selected value changes.
  *   Detail: { value: string, option: SelectOption }
  */
@@ -148,7 +178,11 @@ export class DuiSelectPrimitive extends LitElement {
   accessor disabled = false;
 
   /** Position the popup so the selected item overlays the trigger (macOS-style). */
-  @property({ type: Boolean, attribute: "align-item-to-trigger", reflect: true })
+  @property({
+    type: Boolean,
+    attribute: "align-item-to-trigger",
+    reflect: true,
+  })
   accessor alignItemToTrigger = true;
 
   /** Name for form submission. */
@@ -248,9 +282,8 @@ export class DuiSelectPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           this.#popup.open();
         } else {
-          this.#highlightedIndex = this.#nextEnabledIndex(
-            this.#highlightedIndex,
-            1,
+          this.#moveHighlight(
+            this.#nextEnabledIndex(this.#highlightedIndex, 1),
           );
         }
         break;
@@ -261,9 +294,8 @@ export class DuiSelectPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           this.#popup.open();
         } else {
-          this.#highlightedIndex = this.#nextEnabledIndex(
-            this.#highlightedIndex,
-            -1,
+          this.#moveHighlight(
+            this.#nextEnabledIndex(this.#highlightedIndex, -1),
           );
         }
         break;
@@ -272,7 +304,7 @@ export class DuiSelectPrimitive extends LitElement {
       case "Home": {
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = this.#nextEnabledIndex(-1, 1);
+          this.#moveHighlight(this.#nextEnabledIndex(-1, 1));
         }
         break;
       }
@@ -280,9 +312,8 @@ export class DuiSelectPrimitive extends LitElement {
       case "End": {
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = this.#nextEnabledIndex(
-            this.options.length,
-            -1,
+          this.#moveHighlight(
+            this.#nextEnabledIndex(this.options.length, -1),
           );
         }
         break;
@@ -341,8 +372,7 @@ export class DuiSelectPrimitive extends LitElement {
   }
 
   #focusTrigger(): void {
-    const trigger =
-      this.shadowRoot?.querySelector<HTMLElement>(".Trigger");
+    const trigger = this.shadowRoot?.querySelector<HTMLElement>(".Trigger");
     trigger?.focus();
   }
 
@@ -352,16 +382,70 @@ export class DuiSelectPrimitive extends LitElement {
    * falls back to normal below/above positioning instead of overlaying the
    * selected item on the trigger — this reveals the current selection.
    */
+  /**
+   * Move the highlight and keep it on screen.
+   *
+   * The highlight is virtual — `#highlightedIndex` plus `aria-activedescendant`,
+   * with DOM focus staying on the trigger — so the browser's "scroll the focused
+   * element into view" behaviour never fires and nothing else compensates.
+   * Without this, arrowing past the fold walks the highlight out of sight while
+   * the scroll position sits still. Follows `command-item`, which already does
+   * this on selection.
+   *
+   * `block: "nearest"` is deliberate: it scrolls the minimum distance, so
+   * stepping one row past the fold advances by one row rather than jumping the
+   * list, and it is a no-op when the option is already visible.
+   *
+   * Not used for the open-time assignment in `onOpen`, which centres the
+   * current selection instead — see `#scrollSelectedIntoView`.
+   */
+  #moveHighlight(index: number): void {
+    this.#highlightedIndex = index;
+    this.updateComplete.then(() => {
+      this.shadowRoot
+        ?.querySelector<HTMLElement>("[data-highlighted]")
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
   #scrollSelectedIntoView(): void {
     const popup = this.shadowRoot?.querySelector<HTMLElement>(".Popup");
     const item = this.shadowRoot?.querySelector<HTMLElement>("[data-selected]");
     if (!popup || !item) return;
-    if (popup.scrollHeight <= popup.clientHeight) return;
-    popup.scrollTop = item.offsetTop -
-      (popup.clientHeight - item.offsetHeight) / 2;
+
+    const scroller = resolveScrollContainer(popup) ?? popup;
+    if (scroller.scrollHeight <= scroller.clientHeight) return;
+
+    // Measure via rects rather than `offsetTop`: if a `<dui-scroll-area>` owns
+    // scrolling, the item's offsetParent is no longer the scrolling element.
+    const itemRect = item.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const itemTop = itemRect.top - scrollerRect.top + scroller.scrollTop;
+
+    scroller.scrollTop = itemTop -
+      (scroller.clientHeight - itemRect.height) / 2;
   }
 
   // ---- Render ----
+
+  /**
+   * State has to ride in the part *name*: an attribute selector cannot follow
+   * `::part()`, so `::part(item)[data-selected]` is not a valid selector. The
+   * `data-*` attributes stay for stylesheets injected into this shadow root
+   * (where `.Item[data-selected]` works); `::part(item-selected)` is the
+   * equivalent for consumers styling from outside.
+   */
+  #itemPart = (
+    isSelected: boolean,
+    isHighlighted: boolean,
+    isDisabled: boolean,
+  ): string =>
+    [
+      "item",
+      isSelected && "item-selected",
+      isHighlighted && "item-highlighted",
+      isDisabled && "item-disabled",
+    ].filter(Boolean).join(" ");
 
   #renderItem = (option: SelectOption, index: number): TemplateResult => {
     const isSelected = option.value === this.value;
@@ -370,6 +454,7 @@ export class DuiSelectPrimitive extends LitElement {
     return html`
       <div
         class="Item"
+        part="${this.#itemPart(isSelected, isHighlighted, !!option.disabled)}"
         role="option"
         id="${this.#listboxId}-option-${index}"
         aria-selected="${isSelected}"
@@ -379,12 +464,20 @@ export class DuiSelectPrimitive extends LitElement {
         @click="${() => this.#onItemClick(option)}"
         @mouseenter="${() => this.#onItemMouseEnter(index)}"
       >
-        <span class="ItemIndicator">
+        <span class="ItemIndicator" part="item-indicator">
           ${isSelected
-            ? html`<dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></dui-icon>`
+            ? html`
+              <dui-icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </dui-icon>
+            `
             : nothing}
         </span>
-        <span class="ItemText">${option.label}</span>
+        <span class="ItemText" part="item-text">${option.label}</span>
       </div>
     `;
   };
@@ -418,24 +511,34 @@ export class DuiSelectPrimitive extends LitElement {
           ${hasValue ? this.#displayValue : this.placeholder}
         </span>
         <span class="Icon">
-          <dui-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></dui-icon>
+          <dui-icon>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </dui-icon>
         </span>
       </div>
 
       <div
         class="Popup"
+        part="popup"
         popover="auto"
         ?data-align-inner="${this.alignItemToTrigger && this.value !== ""}"
         @toggle="${this.#popup.handleToggle}"
       >
-        <div
-          class="Listbox"
-          id="${this.#listboxId}"
-          role="listbox"
-          @mousedown="${this.#onListMouseDown}"
-        >
-          ${repeat(this.options, (option) => option.value, this.#renderItem)}
-        </div>
+        <dui-scroll-area>
+          <div
+            class="Listbox"
+            part="listbox"
+            id="${this.#listboxId}"
+            role="listbox"
+            @mousedown="${this.#onListMouseDown}"
+          >
+            ${repeat(this.options, (option) => option.value, this.#renderItem)}
+          </div>
+        </dui-scroll-area>
       </div>
     `;
   }
