@@ -183,6 +183,13 @@ export class DuiSplitButtonPrimitive extends LitElement {
         items[i]!.removeAttribute("data-highlighted");
       }
     }
+
+    // The highlight is virtual — a data attribute, with DOM focus never moving
+    // to the item — so the browser never scrolls for us. Without this, arrowing
+    // past the fold walks the highlight out of sight while the scroll position
+    // sits still. `block: "nearest"` scrolls the minimum distance and is a
+    // no-op when the item is already visible.
+    items[this.#highlightedIndex]?.scrollIntoView({ block: "nearest" });
   }
 
   // ---- Action zone handlers ----

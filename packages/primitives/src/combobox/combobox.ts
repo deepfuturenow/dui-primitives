@@ -327,6 +327,29 @@ export class DuiComboboxPrimitive extends LitElement {
     }
   };
 
+  /**
+   * Move the highlight and keep it on screen.
+   *
+   * The highlight is virtual — `#highlightedIndex` plus `aria-activedescendant`,
+   * with DOM focus staying on the input — so the browser's "scroll the focused
+   * element into view" behaviour never fires and nothing else compensates.
+   * Without this, arrowing past the fold walks the highlight out of sight while
+   * the scroll position sits still. Follows `command-item`, which already does
+   * this on selection.
+   *
+   * `block: "nearest"` is deliberate: it scrolls the minimum distance, so
+   * stepping one row past the fold advances by one row rather than jumping the
+   * list, and it is a no-op when the option is already visible.
+   */
+  #moveHighlight(index: number): void {
+    this.#highlightedIndex = index;
+    this.updateComplete.then(() => {
+      this.shadowRoot
+        ?.querySelector<HTMLElement>("[data-highlighted]")
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
   #onInputKeyDown = (event: KeyboardEvent): void => {
     const filtered = this.#filteredOptions;
 
@@ -336,9 +359,8 @@ export class DuiComboboxPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           if (!this.disabled) this.#popup.open();
         } else {
-          this.#highlightedIndex = Math.min(
-            this.#highlightedIndex + 1,
-            filtered.length - 1,
+          this.#moveHighlight(
+            Math.min(this.#highlightedIndex + 1, filtered.length - 1),
           );
         }
         break;
@@ -348,7 +370,7 @@ export class DuiComboboxPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           if (!this.disabled) this.#popup.open();
         } else {
-          this.#highlightedIndex = Math.max(this.#highlightedIndex - 1, 0);
+          this.#moveHighlight(Math.max(this.#highlightedIndex - 1, 0));
         }
         break;
 
@@ -385,14 +407,14 @@ export class DuiComboboxPrimitive extends LitElement {
       case "Home":
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = 0;
+          this.#moveHighlight(0);
         }
         break;
 
       case "End":
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = filtered.length - 1;
+          this.#moveHighlight(filtered.length - 1);
         }
         break;
 

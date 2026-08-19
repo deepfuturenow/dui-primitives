@@ -282,9 +282,8 @@ export class DuiSelectPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           this.#popup.open();
         } else {
-          this.#highlightedIndex = this.#nextEnabledIndex(
-            this.#highlightedIndex,
-            1,
+          this.#moveHighlight(
+            this.#nextEnabledIndex(this.#highlightedIndex, 1),
           );
         }
         break;
@@ -295,9 +294,8 @@ export class DuiSelectPrimitive extends LitElement {
         if (!this.#popup.isOpen) {
           this.#popup.open();
         } else {
-          this.#highlightedIndex = this.#nextEnabledIndex(
-            this.#highlightedIndex,
-            -1,
+          this.#moveHighlight(
+            this.#nextEnabledIndex(this.#highlightedIndex, -1),
           );
         }
         break;
@@ -306,7 +304,7 @@ export class DuiSelectPrimitive extends LitElement {
       case "Home": {
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = this.#nextEnabledIndex(-1, 1);
+          this.#moveHighlight(this.#nextEnabledIndex(-1, 1));
         }
         break;
       }
@@ -314,9 +312,8 @@ export class DuiSelectPrimitive extends LitElement {
       case "End": {
         if (this.#popup.isOpen) {
           event.preventDefault();
-          this.#highlightedIndex = this.#nextEnabledIndex(
-            this.options.length,
-            -1,
+          this.#moveHighlight(
+            this.#nextEnabledIndex(this.options.length, -1),
           );
         }
         break;
@@ -385,6 +382,32 @@ export class DuiSelectPrimitive extends LitElement {
    * falls back to normal below/above positioning instead of overlaying the
    * selected item on the trigger — this reveals the current selection.
    */
+  /**
+   * Move the highlight and keep it on screen.
+   *
+   * The highlight is virtual — `#highlightedIndex` plus `aria-activedescendant`,
+   * with DOM focus staying on the trigger — so the browser's "scroll the focused
+   * element into view" behaviour never fires and nothing else compensates.
+   * Without this, arrowing past the fold walks the highlight out of sight while
+   * the scroll position sits still. Follows `command-item`, which already does
+   * this on selection.
+   *
+   * `block: "nearest"` is deliberate: it scrolls the minimum distance, so
+   * stepping one row past the fold advances by one row rather than jumping the
+   * list, and it is a no-op when the option is already visible.
+   *
+   * Not used for the open-time assignment in `onOpen`, which centres the
+   * current selection instead — see `#scrollSelectedIntoView`.
+   */
+  #moveHighlight(index: number): void {
+    this.#highlightedIndex = index;
+    this.updateComplete.then(() => {
+      this.shadowRoot
+        ?.querySelector<HTMLElement>("[data-highlighted]")
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
   #scrollSelectedIntoView(): void {
     const popup = this.shadowRoot?.querySelector<HTMLElement>(".Popup");
     const item = this.shadowRoot?.querySelector<HTMLElement>("[data-selected]");
