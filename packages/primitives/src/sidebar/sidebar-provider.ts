@@ -52,7 +52,19 @@ export class DuiSidebarProviderPrimitive extends LitElement {
   @property({ reflect: true })
   accessor variant: "sidebar" | "floating" | "inset" = "sidebar";
 
-  /** How the sidebar collapses. */
+  /**
+   * How the sidebar collapses.
+   *
+   * - `offcanvas` — slides fully off-canvas when collapsed (desktop width transition).
+   * - `icon` — collapses to a narrow icon rail.
+   * - `none` — never collapses.
+   * - `always` — always renders as a full-screen mobile overlay at *every* viewport
+   *   width. This intentionally forces the mobile path (`isMobile = true`) and skips
+   *   the desktop media query, so the desktop width-transition, `default-open`
+   *   seeding, and the `open` property do not apply. Observe overlay state via the
+   *   `open-change` event or the reflected `data-open-mobile` attribute on
+   *   `<dui-sidebar>`, and drive it with `toggleSidebar()` / the trigger.
+   */
   @property({ reflect: true })
   accessor collapsible: "offcanvas" | "icon" | "none" | "always" = "offcanvas";
 
@@ -76,17 +88,17 @@ export class DuiSidebarProviderPrimitive extends LitElement {
   #setOpen = (value: boolean): void => {
     if (this.#isMobile) {
       this.#openMobile = value;
-    } else {
-      if (this.open === undefined) {
-        this.#internalOpen = value;
-      }
-      this.dispatchEvent(openChangeEvent({ open: value }));
+    } else if (this.open === undefined) {
+      this.#internalOpen = value;
     }
+    // Fire from both branches so consumers can observe the overlay too — not
+    // just the desktop rail.
+    this.dispatchEvent(openChangeEvent({ open: value }));
   };
 
   #toggleSidebar = (): void => {
     if (this.#isMobile) {
-      this.#openMobile = !this.#openMobile;
+      this.#setOpen(!this.#openMobile);
     } else {
       this.#setOpen(!this.#isOpen);
     }

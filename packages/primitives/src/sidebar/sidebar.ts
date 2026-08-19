@@ -4,6 +4,10 @@ import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { ContextConsumer } from "@lit/context";
 import { base } from "../core/base.ts";
+import {
+  getComposedFocusableElements,
+  queryComposedAutofocus,
+} from "../core/dom.ts";
 import { sidebarContext } from "./sidebar-context.ts";
 
 const styles = css`
@@ -118,6 +122,8 @@ export class DuiSidebarPrimitive extends LitElement {
   @state()
   accessor #endingStyle = false;
 
+  #previouslyFocused: HTMLElement | undefined;
+
   #ctx = new ContextConsumer(this, {
     context: sidebarContext,
     subscribe: true,
@@ -132,6 +138,10 @@ export class DuiSidebarPrimitive extends LitElement {
     this.dataset.variant = ctx.variant;
     this.dataset.collapsible = ctx.collapsible;
 
+    // Reflect overlay open state so consumers can observe it without reaching
+    // into the shadow DOM (CSS `[data-open-mobile]` or a MutationObserver).
+    this.toggleAttribute("data-open-mobile", ctx.isMobile && ctx.openMobile);
+
     // Handle mobile panel animation
     if (ctx.isMobile) {
       if (ctx.openMobile && !this.#mounted) {
@@ -143,6 +153,9 @@ export class DuiSidebarPrimitive extends LitElement {
   }
 
   async #animateOpen(): Promise<void> {
+    this.#previouslyFocused = (document.activeElement as HTMLElement) ??
+      undefined;
+
     this.#mounted = true;
     this.#startingStyle = true;
 
@@ -151,6 +164,9 @@ export class DuiSidebarPrimitive extends LitElement {
     );
 
     this.#startingStyle = false;
+
+    await this.updateComplete;
+    this.#trapFocusIn();
   }
 
   #animateClose(): void {
@@ -180,6 +196,42 @@ export class DuiSidebarPrimitive extends LitElement {
   #finishClose(): void {
     this.#endingStyle = false;
     this.#mounted = false;
+    this.#restoreFocus();
+  }
+
+  #panel(): HTMLElement | null {
+    return (this.shadowRoot?.querySelector(".MobilePanel") as
+      | HTMLElement
+      | null) ?? null;
+  }
+
+  /**
+   * Move focus into the panel when it opens. The panel is `role="dialog"
+   * tabindex="-1"`, so without this its keydown handler never runs and Escape
+   * / Tab-trap are unreachable. Mirrors `<dui-dialog-popup>`.
+   */
+  #trapFocusIn(): void {
+    const panel = this.#panel();
+    if (!panel) return;
+
+    const autoEl = queryComposedAutofocus(panel);
+    if (autoEl) {
+      autoEl.focus();
+      return;
+    }
+
+    const focusables = getComposedFocusableElements(panel);
+    if (focusables.length > 0) {
+      focusables[0].focus();
+      return;
+    }
+
+    panel.focus();
+  }
+
+  #restoreFocus(): void {
+    this.#previouslyFocused?.focus();
+    this.#previouslyFocused = undefined;
   }
 
   #onBackdropClick = (): void => {
@@ -189,9 +241,40 @@ export class DuiSidebarPrimitive extends LitElement {
   #onMobileKeyDown = (e: KeyboardEvent): void => {
     if (e.key === "Escape") {
       e.preventDefault();
+      e.stopPropagation();
       this.#ctx.value?.setOpen(false);
+      return;
+    }
+
+    if (e.key === "Tab") {
+      this.#trapTab(e);
     }
   };
+
+  #trapTab(e: KeyboardEvent): void {
+    const panel = this.#panel();
+    if (!panel) return;
+
+    const focusables = getComposedFocusableElements(panel);
+    if (focusables.length === 0) {
+      e.preventDefault();
+      return;
+    }
+
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const isFirst = first.matches(":focus");
+    const isLast = last.matches(":focus");
+    const panelHasFocus = !focusables.some((el) => el.matches(":focus"));
+
+    if (e.shiftKey && (isFirst || panelHasFocus)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && isLast) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   override render(): TemplateResult {
     const ctx = this.#ctx.value;
