@@ -59,10 +59,13 @@ export const base = css`
     font-size: inherit;
   }
 
-  a,
-  a:visited,
-  a:hover,
-  a:active {
+  /* Deliberately unqualified: any state pseudo-class here (:visited, :hover,
+     :active) would raise this to specificity (0,1,1) and beat a component's own
+     [part="root"] { color: ... } at (0,1,0) — silently overriding it once the
+     href is in history. A bare "a" at (0,0,1) still neutralises the UA link
+     colours for every state, since author rules beat the UA origin regardless
+     of specificity. */
+  a {
     color: inherit;
   }
 
