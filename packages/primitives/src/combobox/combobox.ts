@@ -171,6 +171,17 @@ const componentStyles = css`
  *   Detail: { value: string, option: SelectOption }
  * @fires values-change - Multi-select: fired when a value is toggled.
  *   Detail: { value: string, selected: boolean, values: Set<string> }
+ * @csspart chips - The chip container shown in multi-select mode.
+ * @csspart input-wrapper - The single-select input container.
+ * @csspart popup - The floating list container.
+ * @csspart list - The scrolling list inside the popup.
+ * @csspart item - An option row.
+ * @csspart item-selected - Present on selected options. An attribute selector cannot
+ *   follow `::part()`, so state rides in the part name rather than `[data-selected]`.
+ * @csspart item-highlighted - Present on the keyboard-highlighted option.
+ * @csspart item-text - The option label.
+ * @csspart item-indicator - The check mark slot on each option.
+ * @csspart empty - The "No results" row.
  * @cssprop [--dui-available-height] - Space between the input and the viewport
  *   edge, published on every reposition. The popup caps itself against this, so
  *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
@@ -486,6 +497,20 @@ export class DuiComboboxPrimitive extends LitElement {
     `;
   };
 
+  /**
+   * State has to ride in the part *name*: an attribute selector cannot follow
+   * `::part()`, so `::part(item)[data-selected]` is not a valid selector. The
+   * `data-*` attributes stay for stylesheets injected into this shadow root
+   * (where `.Item[data-selected]` works); `::part(item-selected)` is the
+   * equivalent for consumers styling from outside.
+   */
+  #itemPart = (isSelected: boolean, isHighlighted: boolean): string =>
+    [
+      "item",
+      isSelected && "item-selected",
+      isHighlighted && "item-highlighted",
+    ].filter(Boolean).join(" ");
+
   #renderItem = (option: SelectOption, index: number): TemplateResult => {
     const isSelected = this.multiple
       ? this.values.has(option.value)
@@ -495,6 +520,7 @@ export class DuiComboboxPrimitive extends LitElement {
     return html`
       <div
         class="Item"
+        part="${this.#itemPart(isSelected, isHighlighted)}"
         role="option"
         id="${this.#listId}-option-${index}"
         aria-selected="${isSelected}"
@@ -502,8 +528,8 @@ export class DuiComboboxPrimitive extends LitElement {
         ?data-highlighted="${isHighlighted}"
         @click="${() => this.#onItemClick(option)}"
       >
-        <span class="ItemText">${option.label}</span>
-        <span class="ItemIndicator">
+        <span class="ItemText" part="item-text">${option.label}</span>
+        <span class="ItemIndicator" part="item-indicator">
           ${isSelected
             ? html`
               <dui-icon>
@@ -527,12 +553,14 @@ export class DuiComboboxPrimitive extends LitElement {
     return html`
       <div
         class="Popup"
+        part="popup"
         popover="auto"
         @toggle="${this.#popup.handleToggle}"
       >
         <dui-scroll-area>
           <div
             class="List"
+            part="list"
             id="${this.#listId}"
             role="listbox"
             aria-labelledby="${this.#inputId}"
@@ -543,7 +571,7 @@ export class DuiComboboxPrimitive extends LitElement {
             ${repeat(filtered, (option) => option.value, this.#renderItem)}
             ${isEmpty
               ? html`
-                <div class="Empty">No results</div>
+                <div class="Empty" part="empty">No results</div>
               `
               : nothing}
           </div>

@@ -64,6 +64,8 @@ const componentStyles = css`
  *
  * @slot trigger - The element that opens the menu on click.
  * @slot default - `dui-menu-item` children rendered inside the popup.
+ * @csspart popup - The floating menu container.
+ * @csspart menu - The scrolling list inside the popup.
  * @cssprop [--dui-available-height] - Space between the trigger and the viewport
  *   edge, published on every reposition. The popup caps itself against this, so
  *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
@@ -252,6 +254,7 @@ export class DuiMenuPrimitive extends LitElement {
       </div>
       <div
         class="Popup"
+        part="popup"
         popover="auto"
         style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
         @toggle="${this.#popup.handleToggle}"
@@ -259,6 +262,7 @@ export class DuiMenuPrimitive extends LitElement {
         <dui-scroll-area>
           <div
             class="Menu"
+            part="menu"
             id="${this.#menuId}"
             role="menu"
             @click="${this.#onItemSlotClick}"

@@ -113,6 +113,8 @@ const componentStyles = css`
  * @csspart action - The left action button element.
  * @csspart divider - The vertical separator between action and trigger.
  * @csspart trigger - The right dropdown trigger button element.
+ * @csspart popup - The floating menu container.
+ * @csspart menu - The scrolling list inside the popup.
  * @cssprop [--dui-available-height] - Space between the trigger and the viewport
  *   edge, published on every reposition. The popup caps itself against this, so
  *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
@@ -362,6 +364,7 @@ export class DuiSplitButtonPrimitive extends LitElement {
       </div>
       <div
         class="Popup"
+        part="popup"
         popover="auto"
         style="${this.popupMinWidth ? `min-width:${this.popupMinWidth}` : ""}"
         @toggle="${this.#popup.handleToggle}"
@@ -369,6 +372,7 @@ export class DuiSplitButtonPrimitive extends LitElement {
         <dui-scroll-area>
           <div
             class="Menu"
+            part="menu"
             id="${this.#menuId}"
             role="menu"
             @click="${this.#onItemSlotClick}"

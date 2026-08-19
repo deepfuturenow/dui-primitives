@@ -133,6 +133,15 @@ const componentStyles = css`
  *
  * @csspart trigger - The trigger button.
  * @csspart value - The displayed value text.
+ * @csspart popup - The floating listbox container.
+ * @csspart listbox - The scrolling list inside the popup.
+ * @csspart item - An option row.
+ * @csspart item-selected - Present on the selected option. An attribute selector cannot
+ *   follow `::part()`, so state rides in the part name rather than `[data-selected]`.
+ * @csspart item-highlighted - Present on the keyboard-highlighted option.
+ * @csspart item-disabled - Present on disabled options.
+ * @csspart item-indicator - The check mark slot on each option.
+ * @csspart item-text - The option label.
  * @cssprop [--dui-available-height] - Space between the trigger and the viewport
  *   edge, published on every reposition. The popup caps itself against this, so
  *   it shrinks on short viewports instead of overflowing. Falls back to `240px`
@@ -396,6 +405,25 @@ export class DuiSelectPrimitive extends LitElement {
 
   // ---- Render ----
 
+  /**
+   * State has to ride in the part *name*: an attribute selector cannot follow
+   * `::part()`, so `::part(item)[data-selected]` is not a valid selector. The
+   * `data-*` attributes stay for stylesheets injected into this shadow root
+   * (where `.Item[data-selected]` works); `::part(item-selected)` is the
+   * equivalent for consumers styling from outside.
+   */
+  #itemPart = (
+    isSelected: boolean,
+    isHighlighted: boolean,
+    isDisabled: boolean,
+  ): string =>
+    [
+      "item",
+      isSelected && "item-selected",
+      isHighlighted && "item-highlighted",
+      isDisabled && "item-disabled",
+    ].filter(Boolean).join(" ");
+
   #renderItem = (option: SelectOption, index: number): TemplateResult => {
     const isSelected = option.value === this.value;
     const isHighlighted = index === this.#highlightedIndex;
@@ -403,6 +431,7 @@ export class DuiSelectPrimitive extends LitElement {
     return html`
       <div
         class="Item"
+        part="${this.#itemPart(isSelected, isHighlighted, !!option.disabled)}"
         role="option"
         id="${this.#listboxId}-option-${index}"
         aria-selected="${isSelected}"
@@ -412,7 +441,7 @@ export class DuiSelectPrimitive extends LitElement {
         @click="${() => this.#onItemClick(option)}"
         @mouseenter="${() => this.#onItemMouseEnter(index)}"
       >
-        <span class="ItemIndicator">
+        <span class="ItemIndicator" part="item-indicator">
           ${isSelected
             ? html`
               <dui-icon>
@@ -425,7 +454,7 @@ export class DuiSelectPrimitive extends LitElement {
             `
             : nothing}
         </span>
-        <span class="ItemText">${option.label}</span>
+        <span class="ItemText" part="item-text">${option.label}</span>
       </div>
     `;
   };
@@ -471,6 +500,7 @@ export class DuiSelectPrimitive extends LitElement {
 
       <div
         class="Popup"
+        part="popup"
         popover="auto"
         ?data-align-inner="${this.alignItemToTrigger && this.value !== ""}"
         @toggle="${this.#popup.handleToggle}"
@@ -478,6 +508,7 @@ export class DuiSelectPrimitive extends LitElement {
         <dui-scroll-area>
           <div
             class="Listbox"
+            part="listbox"
             id="${this.#listboxId}"
             role="listbox"
             @mousedown="${this.#onListMouseDown}"
