@@ -22,7 +22,7 @@
  */
 
 import type { ReactiveController, ReactiveControllerHost } from "lit";
-import type { Placement } from "@floating-ui/dom";
+import type { Placement, VirtualElement } from "@floating-ui/dom";
 import {
   type FloatingPopupSide,
   startFixedAutoUpdate,
@@ -48,12 +48,19 @@ export type FloatingTopLayerControllerOptions = {
    * lines up with the anchor — macOS-style select. Null falls back to normal
    * offset/flip/shift positioning.
    */
-  alignToInner?: () => HTMLElement | null;
+  alignToInner?: () => HTMLElement | VirtualElement | null;
   /**
    * Sub-element inside the anchor to align against (e.g. the trigger's text
    * span). When set, inner alignment targets its vertical center.
    */
   alignToInnerReference?: () => HTMLElement | null;
+  /**
+   * Returns the element that actually scrolls the popup, forwarded to
+   * `AlignInnerOptions.getScrollContainer`. Threaded through here as well
+   * because this controller builds that options object itself from its own
+   * flattened `alignToInner*` fields.
+   */
+  getScrollContainer?: () => HTMLElement | null;
   /** Called after each Floating UI reposition (e.g. to update data-side). */
   onPosition?: (result: { x: number; y: number; placement: Placement }) => void;
   /** Called right after the popup is promoted to the top layer. */
@@ -164,6 +171,7 @@ export class FloatingTopLayerController implements ReactiveController {
         ? {
           getElement: this.#opts.alignToInner,
           getReferenceInner: this.#opts.alignToInnerReference,
+          getScrollContainer: this.#opts.getScrollContainer,
         }
         : undefined,
       onPosition: this.#opts.onPosition,

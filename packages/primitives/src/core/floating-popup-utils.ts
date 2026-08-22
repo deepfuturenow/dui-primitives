@@ -15,6 +15,7 @@ import {
   platform,
   shift,
   size,
+  type VirtualElement,
 } from "@floating-ui/dom";
 
 export type FloatingPopupSide = "top" | "bottom";
@@ -129,8 +130,13 @@ export const resolveScrollContainer = (
 // ---------------------------------------------------------------------------
 
 export type AlignInnerOptions = {
-  /** Returns the inner element to align with the reference. null = use normal positioning. */
-  getElement: () => HTMLElement | null;
+  /**
+   * Returns the inner element to align with the reference. null = use normal
+   * positioning. Accepts a Floating UI `VirtualElement` because alignment
+   * only ever reads `getBoundingClientRect()` — callers that align to a TEXT
+   * rect (a `Range` over the label's text node) have no element to hand over.
+   */
+  getElement: () => HTMLElement | VirtualElement | null;
   /**
    * Returns a sub-element inside the reference to align against.
    * When set, the middleware aligns the vertical center of `getElement()`
@@ -140,6 +146,15 @@ export type AlignInnerOptions = {
   getReferenceInner?: () => HTMLElement | null;
   /** Minimum px from viewport edge. Default: 8. */
   padding?: number;
+  /**
+   * Returns the element that actually scrolls the popup. Callers that own
+   * their markup (or delegate scrolling to a nested element) should pass
+   * this explicitly; without it the scroller is found by the `.Popup` class
+   * name via `resolveScrollContainer()`, which only exists in markup this
+   * library wrote and returns null anywhere else — silently disabling both
+   * scroll compensation and the overflow fallback.
+   */
+  getScrollContainer?: () => HTMLElement | null;
 };
 
 /**
@@ -185,7 +200,9 @@ export const alignInner = (options: AlignInnerOptions): Middleware => ({
     const clampedY = Math.max(minY, Math.min(y, maxY));
 
     // If we clamped, scroll the popup so the selected item stays visible.
-    const scrollContainer = resolveScrollContainer(floatingEl);
+    const scrollContainer = options.getScrollContainer
+      ? options.getScrollContainer()
+      : resolveScrollContainer(floatingEl);
     if (scrollContainer && clampedY !== y) {
       const scrollDelta = y - clampedY; // negative = we pushed down, positive = pushed up
       scrollContainer.scrollTop = Math.max(
@@ -241,7 +258,8 @@ export const computeFixedPosition = (
   // offset/flip/shift positioning, which keeps the popup anchored to the
   // trigger and lets the list scroll internally.
   const innerEl = options.alignToInner?.getElement() ?? null;
-  const scrollContainer = resolveScrollContainer(floating) ?? floating;
+  const scrollContainer = (options.alignToInner?.getScrollContainer?.() ??
+    resolveScrollContainer(floating)) ?? floating;
   const listFits =
     scrollContainer.scrollHeight <= scrollContainer.clientHeight + 1;
   const useInnerAlign = innerEl != null && listFits;
